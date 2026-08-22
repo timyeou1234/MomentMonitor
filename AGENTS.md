@@ -15,6 +15,10 @@ phase detail without becoming an operational dependency.
   `MomentAutomation/runtime/current.json` contract; viewer absence or failure
   must have no effect on automation.
 - Never classify a successful workflow run as completed work; completion requires a merged automation PR and a closed originating Issue.
+- Keep the optional phone dashboard disabled by default and bound only to
+  `127.0.0.1`. Remote access may use Tailscale Serve, never Funnel or public
+  hosting. Keep the mobile snapshot allow-listed and free of credentials, raw
+  controller/process identity, Git SHAs, prompts, responses, findings, and tokens.
 - Keep `Scripts/check_read_only.sh` passing.
 
 ## Commands
@@ -34,7 +38,7 @@ open "dist/Moment Monitor.app"
 
 ## Architecture
 
-- `MomentMonitorCore`: REST models, GET-only GitHub CLI client, dependency parser, run/PR correlation and deterministic state builder.
+- `MomentMonitorCore`: REST models, GET-only GitHub CLI client, dependency parser, run/PR correlation, deterministic state builder, and the localhost-only mobile dashboard transport.
 - `MomentMonitor`: macOS SwiftUI menu-bar UI and polling store.
 - `Tests`: synthetic GitHub fixtures and state contract tests.
 

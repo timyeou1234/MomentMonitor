@@ -4,7 +4,12 @@
   @main
   @MainActor
   struct MomentMonitorApp: App {
-    @StateObject private var store = MonitorStore()
+    @StateObject private var store: MonitorStore
+
+    init() {
+      let store = MonitorStore()
+      self._store = StateObject(wrappedValue: store)
+    }
 
     var body: some Scene {
       MenuBarExtra {

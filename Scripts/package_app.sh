@@ -23,6 +23,10 @@ mkdir -p "$macos" "$resources"
 install -m 755 "$bin_dir/MomentMonitor" "$macos/MomentMonitor"
 install -m 644 "$root/LICENSE" "$resources/LICENSE.txt"
 install -m 644 "$root/THIRD_PARTY_NOTICES.md" "$resources/THIRD_PARTY_NOTICES.md"
+mkdir -p "$resources/MobileDashboard"
+install -m 644 "$root/Sources/MomentMonitorCore/MobileDashboard/index.html" "$resources/MobileDashboard/index.html"
+install -m 644 "$root/Sources/MomentMonitorCore/MobileDashboard/app.css" "$resources/MobileDashboard/app.css"
+install -m 644 "$root/Sources/MomentMonitorCore/MobileDashboard/app.js" "$resources/MobileDashboard/app.js"
 
 cat > "$contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -44,9 +48,9 @@ cat > "$contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.3.0</string>
+  <string>0.4.0</string>
   <key>CFBundleVersion</key>
-  <string>3</string>
+  <string>4</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>

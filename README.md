@@ -1,6 +1,6 @@
 # Moment Monitor
 
-`Moment Monitor` 是 Moments 自動化的 **唯讀 macOS menu-bar viewer**。它不加入 Moments repository、不執行任何 workflow，也不成為 scheduler、Codex task、PR Fast、auto-merge 或下一張 Issue dispatch 的依賴。當同一台 Mac 上有新版 trusted controller 時，它也會安全讀取 controller 主動發布的 credential-free local phase telemetry。
+`Moment Monitor` 是 Moments 自動化的 **唯讀 macOS menu-bar viewer**，並可選擇把同一份狀態透過私人手機 dashboard 顯示。它不加入 Moments repository、不執行任何 workflow，也不成為 scheduler、Codex task、PR Fast、auto-merge 或下一張 Issue dispatch 的依賴。當同一台 Mac 上有新版 trusted controller 時，它也會安全讀取 controller 主動發布的 credential-free local phase telemetry。
 
 本專案參考 RepoBar 的 menu-bar 使用方式，但刻意不攜帶 RepoBar 的多 repository、多帳號、GraphQL、SQLite cache、local git sync、Sparkle updater 與 iOS app。這是一個針對 `timyeou1234/Moment` 的小型獨立 derivative；原因記錄於 [`docs/FORK_DECISION.md`](docs/FORK_DECISION.md)。
 
@@ -19,6 +19,18 @@
 - **Completed**：automation PR 確實 `merged_at != nil`，且對應 Issue 已關閉。Workflow success 本身不會被誤當成完成。
 
 點選任何 row 只會開啟對應的 GitHub Issue、PR 或可見的 Actions run。
+
+## 在 iPhone 查看
+
+手機 dashboard 預設關閉；開啟後也只監聽 `127.0.0.1`，不會直接暴露在區域網路或公網。建議用 [Tailscale](https://tailscale.com/) 的私人網路連回 Mac：
+
+1. 在 Mac 與 iPhone 安裝 Tailscale，登入同一個 tailnet。
+2. 在 Moment Monitor 的 **Settings → Phone dashboard** 開啟服務並套用。
+3. 先按 **Open Local Dashboard**，確認 Mac 本機可以看到頁面。
+4. 按 **Copy Tailscale Command**，在 Mac Terminal 執行複製的 `tailscale serve` 指令。
+5. 執行 `tailscale serve status` 取得私人的 `https://…ts.net` 網址，在 iPhone Safari 開啟；需要時可用 Safari 的「加入主畫面」。
+
+請使用 **Tailscale Serve**，不要使用 Funnel。Serve 只讓 tailnet 中符合 ACL 規則的裝置存取；Funnel 會把服務公開到網際網路。Mac 必須開機、Moment Monitor 必須執行中，而且兩台裝置都要連上 Tailscale。完整安裝、停止方式與故障排除見 [`docs/PHONE_DASHBOARD.md`](docs/PHONE_DASHBOARD.md)。
 
 ## 唯讀邊界
 
@@ -47,7 +59,7 @@ repository sync
 
 它不讀 Moment checkout、不掃 Codex JSONL、不包含 prompt、response、finding、token 或 credential。Viewer 不存在、無法讀取或刪除該檔案時，Moment automation 必須完全不受影響。
 
-詳細 contract 見 [`docs/READ_ONLY_BOUNDARY.md`](docs/READ_ONLY_BOUNDARY.md)。
+手機 snapshot 不包含 controller run ID、PID、Git SHA、credential、prompt 或 response；也沒有 CORS、外部 script、持久化 browser cache 或 public hosting。tailnet 中獲准存取的裝置仍可看到 Issue 標題與目前工作狀態，因此應使用 Tailscale ACL 控制成員。詳細 contract 見 [`docs/READ_ONLY_BOUNDARY.md`](docs/READ_ONLY_BOUNDARY.md)。
 
 ## 系統需求
 
@@ -119,14 +131,14 @@ swift test
 ## 維護方式
 
 - `main` 必須維持可建置、可安裝；功能與修正使用短期 branch 和 pull request。
-- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、45 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
+- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、49 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
 - CI 只使用 synthetic fixtures，不配置 Moment repository credential，也不執行 live refresh。
 - 發布版本使用 semantic version tag（例如 `v0.3.0`）；source 保持公開，但 Developer ID 與 notarization 完成前仍以本機 installer 安裝，不把 ad-hoc signed CI artifact 描述為可公開散佈的正式版本。
 - Moment repository 不保存此 app 的 source copy，也不把它設為 automation dependency。
 
 ## 第一版限制
 
-- 使用 polling，預設每 30 秒更新；沒有 webhook 或背景 server。
+- GitHub 使用 polling，預設每 30 秒更新；沒有 webhook。手機頁面在前景每秒讀取 Mac 的記憶體 snapshot，背景時降為每 10 秒，但 iOS 仍可能暫停背景 Safari。
 - 不讀 runner 上的 Codex JSONL，因此不顯示模型正在修改哪個檔案、執行哪個 shell command、prompt/response 或 Token 消耗；只顯示 controller 的 bounded phase contract。
 - 不發送 native notification；先確認狀態判定在實際 Moments repo 上正確，再決定是否加入。
 - 目前已在 Apple Silicon macOS 以 Swift 6.3.3 / Xcode 26.6 完成 `.app` build、ad-hoc signing、zip 解包與 bounded launch smoke；尚未做 Developer ID notarization 或長時間 polling soak。

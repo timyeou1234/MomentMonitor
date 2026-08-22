@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#11101a">
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Moment Monitor">
+    <title>Moment Monitor</title>
+    <link rel="stylesheet" href="/app.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <div id="connection-banner" class="connection-banner" role="status" hidden>
+      Mac connection interrupted. Showing the last received snapshot.
+    </div>
+
+    <header class="site-header">
+      <div class="brand-lockup">
+        <span class="brand-mark" aria-hidden="true"><span></span></span>
+        <div>
+          <p class="eyebrow">MOMENT AUTOMATION</p>
+          <h1>Monitor</h1>
+        </div>
+      </div>
+      <div class="readonly-badge"><span aria-hidden="true"></span> READ ONLY</div>
+    </header>
+
+    <main>
+      <section class="progress-card glass-card" aria-labelledby="progress-heading">
+        <div>
+          <p class="section-kicker">PROJECT PROGRESS</p>
+          <h2 id="progress-heading"><span id="progress-completed">—</span> of <span id="progress-total">—</span> complete</h2>
+          <p id="progress-copy" class="muted">Waiting for the first secure snapshot from your Mac.</p>
+        </div>
+        <div id="progress-ring" class="progress-ring" role="img" aria-label="Project progress unavailable">
+          <div><strong id="progress-percent">—</strong><span>%</span></div>
+        </div>
+      </section>
+
+      <section id="runtime-card" class="runtime-card" aria-labelledby="runtime-heading">
+        <div class="runtime-topline">
+          <div>
+            <p id="runtime-kicker" class="section-kicker">CURRENT AUTOMATION</p>
+            <h2 id="runtime-heading">Connecting to your Mac…</h2>
+          </div>
+          <span id="runtime-badge" class="status-badge status-idle">WAITING</span>
+        </div>
+
+        <p id="runtime-detail" class="runtime-detail">The controller phase will appear here.</p>
+
+        <div class="stage-track" aria-label="Automation stages">
+          <div id="stage-bars" class="stage-bars" aria-hidden="true"></div>
+          <div id="stage-labels" class="stage-labels"></div>
+        </div>
+
+        <div class="runtime-meta">
+          <span id="runtime-issue">Issue —</span>
+          <span id="runtime-pr">PR not created yet</span>
+          <span id="runtime-time">—</span>
+        </div>
+        <p id="runtime-message" class="runtime-message" hidden></p>
+      </section>
+
+      <section class="work-section" aria-labelledby="work-heading">
+        <div class="section-heading-row">
+          <div>
+            <p class="section-kicker">WORK STREAM</p>
+            <h2 id="work-heading">Repository state</h2>
+          </div>
+          <span id="repository-name" class="repository-name">timyeou1234/Moment</span>
+        </div>
+        <div id="lanes" class="lanes" aria-live="polite">
+          <div class="empty-state">Waiting for repository data…</div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div><span id="connection-dot" class="connection-dot" aria-hidden="true"></span><span id="connection-text">Connecting</span></div>
+      <time id="updated-time">Not updated yet</time>
+    </footer>
+  </body>
+</html>

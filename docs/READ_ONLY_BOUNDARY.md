@@ -47,6 +47,28 @@ repository 不相符則視為與目前 viewer 無關。
 這份資料只證明本機 controller 回報的執行 phase，不證明 PR、check、merge 或
 Issue completion。Viewer 不寫入此檔、不讀 checkout，也不把 telemetry 上傳。
 
+## Optional mobile dashboard output
+
+手機 dashboard 預設關閉，啟用後只綁定 `127.0.0.1`。內建 server 只接受
+`GET` 與 `HEAD`，有 8 KiB request、16 connections 與 5 秒 timeout 上限，且只提供：
+
+```text
+GET /health
+GET /api/v1/snapshot
+GET /, /index.html, /app.css, /app.js
+```
+
+Host 只允許 loopback 名稱/位址及 Tailscale Serve 的 `.ts.net` 名稱；其他 Host
+會被拒絕，避免 DNS rebinding。Response 強制 `no-store`、same-origin CSP/CORP、
+`DENY` frame policy、`nosniff` 與 no-referrer，沒有 CORS。網頁沒有外部 asset、
+service worker、`localStorage` 或持久化 private snapshot。
+
+Mobile snapshot 是明確 allow-list：repository、時間、health、project progress、
+sanitized runtime phase 與各 lane item。它刻意不輸出 controller run ID、PID、
+base/head SHA、credential、prompt、response、finding 或 token。Issue 標題和工作
+狀態本身仍是私人資料；遠端存取只能使用 Tailscale Serve 和適當 ACL，不得使用
+Tailscale Funnel、public tunnel 或公開 hosting。
+
 ## Forbidden behavior
 
 - 非 GET HTTP method；
@@ -60,11 +82,14 @@ Issue completion。Viewer 不寫入此檔、不讀 checkout，也不把 telemetr
 - uploading observer state back to GitHub。
 - writing、renaming、deleting或修復 local controller status；
 - reading prompt、response、finding、JSONL、credential或 private reasoning。
+- binding the mobile dashboard to `0.0.0.0`、LAN interfaces or a public tunnel；
+- exposing raw controller identity、process identity or Git SHA through the mobile API。
 
 ## Enforcement
 
 - API argument builder hardcodes GET。
 - `ReadOnlyContractTests` checks that mutation verbs cannot appear in generated API commands。
 - `Scripts/check_read_only.sh` scans production sources for forbidden command construction and then runs tests。
-- UI exposes only refresh, open URL, settings and quit。
+- UI exposes only refresh, open URL, copy a Tailscale Serve command, settings and quit。
 - Temporary GitHub response files use a random `0700` directory and `0600` files, then are removed immediately after each command。
+- `MobileDashboardTests` exercise the real loopback listener, security headers, method allow-list, untrusted Host rejection and sanitized schema；source scans reject public binding, CORS and browser persistence。

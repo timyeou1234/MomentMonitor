@@ -32,6 +32,10 @@ Unknown schema/field/phase、unsafe permission、symlink、oversize或矛盾的
 phase/model/role/outcome 都是 `INVALID`。Terminal `completed` 仍須 GitHub 同時證明
 merged automation PR + closed originating Issue，否則明示 awaiting confirmation。
 
+Optional phone dashboard 會把同一份 reconciled state 轉成 versioned、sanitized
+的 `schemaVersion: 1` snapshot。它不另外推算 phase 或 completion：精確的 local
+phase 仍來自通過驗證的 controller record，merged/closed completion 仍由 GitHub 證明。
+
 ## Workflow relevance
 
 目前 trusted controller 在本機執行，只把 bounded phase metadata 寫入本機 Application Support；不發布 step transcript 或 token 資料到 GitHub。下列已知 workflow path 只在最近 100 筆 run 中作為向後相容的補充 context；它們不是 viewer 正常工作的依賴：

@@ -20,6 +20,20 @@ if grep -nE "$local_write_forbidden" "$runtime_reader"; then
   exit 1
 fi
 
+dashboard_server="Sources/MomentMonitorCore/MobileDashboardServer.swift"
+grep -q 'loopbackHost = "127.0.0.1"' "$dashboard_server"
+grep -q 'method == "GET" || method == "HEAD"' "$dashboard_server"
+grep -q 'Content-Security-Policy:' "$dashboard_server"
+grep -q 'Cache-Control: no-store' "$dashboard_server"
+if grep -nE '0\.0\.0\.0|Access-Control-Allow-Origin|hasPrefix\("\.ts\.net"\)' "$dashboard_server"; then
+  echo "Mobile dashboard weakens the localhost or same-origin boundary." >&2
+  exit 1
+fi
+if grep -RInE 'https?://|innerHTML|localStorage' Sources/MomentMonitorCore/MobileDashboard; then
+  echo "Mobile dashboard assets contain an external origin or persistent private cache." >&2
+  exit 1
+fi
+
 swift test
 
 echo "Read-only contract and tests passed."

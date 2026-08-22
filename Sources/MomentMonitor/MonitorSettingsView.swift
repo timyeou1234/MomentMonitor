@@ -64,6 +64,50 @@
           .foregroundStyle(.secondary)
         }
 
+        Section("Phone dashboard") {
+          Toggle(
+            "Serve a private dashboard from this Mac", isOn: self.$store.mobileDashboardEnabled)
+          HStack {
+            Text("Local port")
+            Spacer()
+            TextField("Port", value: self.$store.mobileDashboardPort, format: .number)
+              .frame(width: 90)
+              .multilineTextAlignment(.trailing)
+          }
+          if let validationMessage = self.store.mobileDashboardValidationMessage {
+            Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+              .font(.caption)
+              .foregroundStyle(.red)
+          }
+          Label(
+            self.store.mobileDashboardStatusText,
+            systemImage: self.store.mobileDashboardStatusIsError
+              ? "exclamationmark.triangle.fill" : "iphone.gen3"
+          )
+          .font(.caption)
+          .foregroundStyle(self.store.mobileDashboardStatusIsError ? .red : .secondary)
+
+          HStack {
+            Button("Open Local Dashboard") {
+              self.store.openMobileDashboard()
+            }
+            .disabled(self.store.mobileDashboardLocalURL == nil)
+            Button("Copy Tailscale Command") {
+              self.store.copyTailscaleCommand()
+            }
+            .disabled(!self.store.mobileDashboardEnabled)
+          }
+
+          Text(
+            "The server is off by default and binds only to 127.0.0.1. Tailscale Serve can privately proxy it to devices in your tailnet. Never use Tailscale Funnel for this dashboard."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          Text(self.store.tailscaleServeCommand)
+            .font(.caption.monospaced())
+            .textSelection(.enabled)
+        }
+
         if let feedback = self.store.settingsFeedback {
           Label(
             feedback,
@@ -92,7 +136,7 @@
         }
       }
       .formStyle(.grouped)
-      .frame(width: 520, height: 480)
+      .frame(width: 540, height: 680)
       .padding()
     }
   }
