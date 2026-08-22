@@ -138,3 +138,40 @@ func workflowRun(
     } ?? []
   )
 }
+
+func runtimeStatus(
+  issueNumber: Int,
+  pullRequestNumber: Int? = nil,
+  phase: AutomationRuntimePhase = .lunaImplementation,
+  lastActivePhase: AutomationRuntimePhase? = nil,
+  outcome: AutomationRuntimeOutcome = .active,
+  model: AutomationRuntimeModel? = .luna,
+  role: AutomationRuntimeRole? = .implementer,
+  roundNumber: Int? = nil,
+  totalRounds: Int? = nil,
+  repairAttempt: Int? = nil,
+  phaseStartedAt: Date = fixedDate("2026-08-21T13:30:00Z")
+) -> AutomationRuntimeStatus {
+  AutomationRuntimeStatus(
+    repository: "timyeou1234/Moment",
+    runID: "run-\(issueNumber)",
+    issueNumber: issueNumber,
+    pullRequestNumber: pullRequestNumber,
+    mode: .implement,
+    phase: phase,
+    lastActivePhase: lastActivePhase,
+    outcome: outcome,
+    model: model,
+    role: role,
+    roundNumber: roundNumber,
+    totalRounds: totalRounds,
+    repairAttempt: repairAttempt,
+    runnerPID: 65_100,
+    sequence: 3,
+    startedAt: fixedDate("2026-08-21T13:00:00Z"),
+    phaseStartedAt: phaseStartedAt,
+    updatedAt: phaseStartedAt,
+    baseSHA: String(repeating: "a", count: 40),
+    headSHA: String(repeating: "b", count: 40)
+  )
+}

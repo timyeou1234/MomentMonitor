@@ -358,4 +358,106 @@ final class MomentStateBuilderTests: XCTestCase {
     XCTAssertFalse(item?.detail.localizedCaseInsensitiveContains("passed") == true)
   }
 
+  func testLiveRuntimePhaseReplacesTheBroadDevRunningInference() {
+    let trackedIssue = issue(740, title: "Exact local phase", labels: ["dev-running"])
+    let status = runtimeStatus(
+      issueNumber: 740,
+      phase: .lunaVerification,
+      model: .luna,
+      role: .reviewer,
+      roundNumber: 2,
+      totalRounds: 4,
+      repairAttempt: 1
+    )
+
+    let snapshot = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [trackedIssue],
+      pullRequests: [],
+      workflowRuns: [workflowRun(7_400, kind: .localTask, status: "in_progress", issueNumber: 740)],
+      runtimeObservation: .live(status)
+    )
+
+    let running = snapshot.items(in: .running)
+    XCTAssertEqual(running.count, 1)
+    XCTAssertEqual(running.first?.statusText, "Luna")
+    XCTAssertTrue(running.first?.detail.contains("Luna verification") == true)
+    XCTAssertTrue(running.first?.detail.contains("round 2 of 4") == true)
+    XCTAssertFalse(running.first?.detail.contains("not published") == true)
+    XCTAssertEqual(snapshot.runtimeObservation.availability, .live)
+  }
+
+  func testStaleRuntimeStatusRaisesAttentionWithoutInventingCompletion() {
+    let trackedIssue = issue(741, title: "Interrupted local phase", labels: ["dev-running"])
+    let status = runtimeStatus(issueNumber: 741)
+
+    let snapshot = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [trackedIssue],
+      pullRequests: [],
+      workflowRuns: [],
+      runtimeObservation: .stale(status, message: "The controller process is gone.")
+    )
+
+    XCTAssertEqual(snapshot.runtimeObservation.availability, .stale)
+    XCTAssertEqual(snapshot.items(in: .running).first?.severity, .warning)
+    XCTAssertEqual(snapshot.health, .attention)
+    XCTAssertTrue(snapshot.items(in: .completed).isEmpty)
+  }
+
+  func testControllerCompletionRemainsUnconfirmedUntilGitHubTruthMatches() {
+    let openIssue = issue(742, title: "Publishing completion", labels: ["dev-pr-open"])
+    let status = runtimeStatus(
+      issueNumber: 742,
+      pullRequestNumber: 743,
+      phase: .completed,
+      lastActivePhase: .closingIssue,
+      outcome: .completed,
+      model: nil,
+      role: .controller
+    )
+
+    let snapshot = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [openIssue],
+      pullRequests: [pullRequest(743, title: "Implement #742", issueNumber: 742)],
+      workflowRuns: [],
+      runtimeObservation: .terminal(status)
+    )
+
+    XCTAssertTrue(snapshot.items(in: .completed).isEmpty)
+    XCTAssertTrue(snapshot.runtimeObservation.message?.contains("Awaiting GitHub") == true)
+  }
+
+  func testControllerCompletionIsCorroboratedByMergedPRAndClosedIssue() {
+    let closedIssue = issue(744, title: "Confirmed completion", state: "closed")
+    let merged = pullRequest(
+      745,
+      title: "Implement #744",
+      state: "closed",
+      issueNumber: 744,
+      mergedAt: fixedDate("2026-08-21T13:50:00Z")
+    )
+    let status = runtimeStatus(
+      issueNumber: 744,
+      pullRequestNumber: 745,
+      phase: .completed,
+      lastActivePhase: .closingIssue,
+      outcome: .completed,
+      model: nil,
+      role: .controller
+    )
+
+    let snapshot = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [closedIssue],
+      pullRequests: [merged],
+      workflowRuns: [],
+      runtimeObservation: .terminal(status)
+    )
+
+    XCTAssertEqual(snapshot.items(in: .completed).map(\.issueNumber), [744])
+    XCTAssertTrue(snapshot.runtimeObservation.message?.contains("GitHub confirms") == true)
+  }
+
 }

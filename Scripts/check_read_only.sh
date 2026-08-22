@@ -11,6 +11,15 @@ if grep -RInEi --include="*.swift" "$forbidden" Sources; then
   exit 1
 fi
 
+runtime_reader="Sources/MomentMonitorCore/AutomationRuntimeStatusReader.swift"
+grep -q 'O_RDONLY' "$runtime_reader"
+grep -q 'O_NOFOLLOW' "$runtime_reader"
+local_write_forbidden='O_WRONLY|O_RDWR|createFile|removeItem|moveItem|replaceItem|setAttributes|\.write\('
+if grep -nE "$local_write_forbidden" "$runtime_reader"; then
+  echo "Local runtime reader contains a write-capable operation." >&2
+  exit 1
+fi
+
 swift test
 
 echo "Read-only contract and tests passed."

@@ -52,6 +52,18 @@
           .foregroundStyle(.secondary)
         }
 
+        Section("Local phase telemetry") {
+          Label(
+            "Reads the controller-owned runtime/current.json file when available.",
+            systemImage: "waveform.path.ecg"
+          )
+          Text(
+            "The file is optional, credential-free, and never used as merge or completion evidence. Unsafe permissions, unknown fields, dead processes, and schema mismatches fail closed."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        }
+
         if let feedback = self.store.settingsFeedback {
           Label(
             feedback,
@@ -80,7 +92,7 @@
         }
       }
       .formStyle(.grouped)
-      .frame(width: 520, height: 390)
+      .frame(width: 520, height: 480)
       .padding()
     }
   }

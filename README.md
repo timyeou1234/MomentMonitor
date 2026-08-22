@@ -1,6 +1,6 @@
 # Moment Monitor
 
-`Moment Monitor` 是 Moments 自動化的 **唯讀 macOS menu-bar viewer**。它不加入 Moments repository、不執行任何 workflow，也不成為 scheduler、Codex task、PR Fast、auto-merge 或下一張 Issue dispatch 的依賴。
+`Moment Monitor` 是 Moments 自動化的 **唯讀 macOS menu-bar viewer**。它不加入 Moments repository、不執行任何 workflow，也不成為 scheduler、Codex task、PR Fast、auto-merge 或下一張 Issue dispatch 的依賴。當同一台 Mac 上有新版 trusted controller 時，它也會安全讀取 controller 主動發布的 credential-free local phase telemetry。
 
 本專案參考 RepoBar 的 menu-bar 使用方式，但刻意不攜帶 RepoBar 的多 repository、多帳號、GraphQL、SQLite cache、local git sync、Sparkle updater 與 iOS app。這是一個針對 `timyeou1234/Moment` 的小型獨立 derivative；原因記錄於 [`docs/FORK_DECISION.md`](docs/FORK_DECISION.md)。
 
@@ -9,10 +9,11 @@
 介面依照 Moments 現行自動化生命週期分成：
 
 - **Project progress**：以 tracked automation Issues 為範圍；只有 automation PR 已 merged 且 originating Issue 已 closed 才計入完成。百分比使用完整歷史完成數，不受 Completed 清單顯示上限影響。
+- **Current automation**：精確顯示 Luna 開發、PR Fast、Sol review/repair、Luna verification、Sol High unblock、PR publication、exact-head verification、merge 與 Issue closure；包含模型角色、回合、Issue/PR identity、階段耗時與五段 lifecycle track。
 - **Ready**：owner-authored Issue 具有 `dev-ready` 或 `moment:dev-ready` marker，且直接依賴都已關閉；排序與 scheduler 相同。
 - **Waiting on dependencies**：符合 ready 條件，但 `moment:depends-on` 仍有 open Issue。
 - **Runner queue**：若 repository 仍有可見的相關 GitHub Actions run，狀態為 `queued`、`waiting`、`pending` 或 `requested`。
-- **Running**：`dev-running` 表示本機 trusted task 正在執行；本機 runner 細節不會假裝成 GitHub 可觀測資料。若相關 workflow run 可見，才會補充目前 step。
+- **Running**：優先使用通過 schema、owner、permission、size 與 live-PID 驗證的 local phase telemetry；沒有有效 telemetry 時，才退回 `dev-running` 的粗略 GitHub 狀態。
 - **PR / Checks**：locally reviewed automation PR 已開啟，但目前沒有 active run。
 - **Blocked / Failed**：`dev-blocked`，或 repository state 與可見 workflow/PR 不一致。
 - **Completed**：automation PR 確實 `merged_at != nil`，且對應 Issue 已關閉。Workflow success 本身不會被誤當成完成。
@@ -37,6 +38,14 @@ merge / close / reopen
 branch or local checkout changes
 repository sync
 ```
+
+此外只會讀取本機：
+
+```text
+~/Library/Application Support/MomentAutomation/runtime/current.json
+```
+
+它不讀 Moment checkout、不掃 Codex JSONL、不包含 prompt、response、finding、token 或 credential。Viewer 不存在、無法讀取或刪除該檔案時，Moment automation 必須完全不受影響。
 
 詳細 contract 見 [`docs/READ_ONLY_BOUNDARY.md`](docs/READ_ONLY_BOUNDARY.md)。
 
@@ -110,15 +119,15 @@ swift test
 ## 維護方式
 
 - `main` 必須維持可建置、可安裝；功能與修正使用短期 branch 和 pull request。
-- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、33 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
+- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、45 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
 - CI 只使用 synthetic fixtures，不配置 Moment repository credential，也不執行 live refresh。
-- 發布版本使用 semantic version tag（例如 `v0.2.0`）；source 保持公開，但 Developer ID 與 notarization 完成前仍以本機 installer 安裝，不把 ad-hoc signed CI artifact 描述為可公開散佈的正式版本。
+- 發布版本使用 semantic version tag（例如 `v0.3.0`）；source 保持公開，但 Developer ID 與 notarization 完成前仍以本機 installer 安裝，不把 ad-hoc signed CI artifact 描述為可公開散佈的正式版本。
 - Moment repository 不保存此 app 的 source copy，也不把它設為 automation dependency。
 
 ## 第一版限制
 
 - 使用 polling，預設每 30 秒更新；沒有 webhook 或背景 server。
-- 不讀 runner 上的 Codex JSONL，因此不顯示模型正在修改哪個檔案、執行哪個 shell command 或 Token 消耗。
+- 不讀 runner 上的 Codex JSONL，因此不顯示模型正在修改哪個檔案、執行哪個 shell command、prompt/response 或 Token 消耗；只顯示 controller 的 bounded phase contract。
 - 不發送 native notification；先確認狀態判定在實際 Moments repo 上正確，再決定是否加入。
 - 目前已在 Apple Silicon macOS 以 Swift 6.3.3 / Xcode 26.6 完成 `.app` build、ad-hoc signing、zip 解包與 bounded launch smoke；尚未做 Developer ID notarization 或長時間 polling soak。
 

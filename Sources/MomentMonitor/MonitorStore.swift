@@ -18,6 +18,7 @@
 
     private var service: MomentMonitorService?
     private var pollingTask: Task<Void, Never>?
+    private var runtimePollingTask: Task<Void, Never>?
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -29,6 +30,7 @@
       self.snapshot = .empty(repository: .moment)
 
       self.restartPolling()
+      self.startRuntimePolling()
       Task { await self.refresh() }
     }
 
@@ -92,8 +94,8 @@
           service = existing
         } else {
           let created = try MomentMonitorService.live()
-          try await created.verifyPrerequisites()
           self.service = created
+          try await created.verifyPrerequisites()
           service = created
         }
 
@@ -102,6 +104,10 @@
         self.hasSuccessfulRefresh = true
         self.lastError = nil
       } catch {
+        if let service = self.service, let configuration = try? self.configuration() {
+          let runtimeObservation = await service.readRuntimeStatus(configuration: configuration)
+          self.snapshot = self.snapshot.replacingRuntimeObservation(runtimeObservation)
+        }
         self.lastError = error.localizedDescription
       }
     }
@@ -161,6 +167,23 @@
           try? await Task.sleep(nanoseconds: interval)
           guard let self, !Task.isCancelled else { return }
           await self.refresh()
+        }
+      }
+    }
+
+    private func startRuntimePolling() {
+      self.runtimePollingTask?.cancel()
+      self.runtimePollingTask = Task { [weak self] in
+        while !Task.isCancelled {
+          try? await Task.sleep(nanoseconds: 1_000_000_000)
+          guard let self else { return }
+          guard !Task.isCancelled, let service = self.service,
+            let configuration = try? self.configuration()
+          else { continue }
+          let observation = await service.readRuntimeStatus(configuration: configuration)
+          if observation != self.snapshot.runtimeObservation {
+            self.snapshot = self.snapshot.replacingRuntimeObservation(observation)
+          }
         }
       }
     }

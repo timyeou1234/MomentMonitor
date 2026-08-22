@@ -1,0 +1,276 @@
+import Foundation
+
+public enum AutomationRuntimeMode: String, Codable, Sendable {
+  case implement
+  case review
+  case repair
+  case unblock
+}
+
+public enum AutomationRuntimeOutcome: String, Codable, Sendable {
+  case active
+  case completed
+  case blocked
+  case failed
+  case stopped
+}
+
+public enum AutomationRuntimeRole: String, Codable, Sendable {
+  case controller
+  case implementer
+  case validator
+  case reviewer
+  case repairer
+  case publisher
+}
+
+public enum AutomationRuntimeModel: String, Codable, Sendable {
+  case luna = "gpt-5.6-luna"
+  case sol = "gpt-5.6-sol"
+
+  public var displayName: String {
+    switch self {
+    case .luna: "Luna"
+    case .sol: "Sol"
+    }
+  }
+}
+
+public enum AutomationRuntimeStage: Int, CaseIterable, Codable, Sendable {
+  case prepare
+  case develop
+  case validate
+  case review
+  case publish
+
+  public var title: String {
+    switch self {
+    case .prepare: "Prepare"
+    case .develop: "Develop"
+    case .validate: "Validate"
+    case .review: "Review"
+    case .publish: "Publish"
+    }
+  }
+}
+
+public enum AutomationRuntimePhase: String, Codable, CaseIterable, Sendable {
+  case preparingWorkspace = "preparing_workspace"
+  case adoptingExistingPR = "adopting_existing_pr"
+  case lunaImplementation = "luna_implementation"
+  case solCIRepair = "sol_ci_repair"
+  case solHighUnblock = "sol_high_unblock"
+  case committingCandidate = "committing_candidate"
+  case prFast = "pr_fast"
+  case solPRFastRepair = "sol_pr_fast_repair"
+  case solReview = "sol_review"
+  case solReviewRepair = "sol_review_repair"
+  case lunaVerification = "luna_verification"
+  case publishingBranch = "publishing_branch"
+  case creatingPR = "creating_pr"
+  case verifyingExactHead = "verifying_exact_head"
+  case mergingPR = "merging_pr"
+  case closingIssue = "closing_issue"
+  case completed
+  case blocked
+  case failed
+  case stoppedNoChange = "stopped_no_change"
+
+  public var title: String {
+    switch self {
+    case .preparingWorkspace: "Preparing workspace"
+    case .adoptingExistingPR: "Adopting existing PR"
+    case .lunaImplementation: "Luna development"
+    case .solCIRepair: "Sol CI repair"
+    case .solHighUnblock: "Sol High unblock"
+    case .committingCandidate: "Committing candidate"
+    case .prFast: "PR Fast validation"
+    case .solPRFastRepair: "Sol PR Fast repair"
+    case .solReview: "Sol review"
+    case .solReviewRepair: "Sol review repair"
+    case .lunaVerification: "Luna verification"
+    case .publishingBranch: "Publishing branch"
+    case .creatingPR: "Creating pull request"
+    case .verifyingExactHead: "Verifying exact head"
+    case .mergingPR: "Merging pull request"
+    case .closingIssue: "Closing originating Issue"
+    case .completed: "Completed"
+    case .blocked: "Blocked"
+    case .failed: "Failed"
+    case .stoppedNoChange: "Stopped without a patch"
+    }
+  }
+
+  public var stage: AutomationRuntimeStage {
+    switch self {
+    case .preparingWorkspace, .adoptingExistingPR:
+      .prepare
+    case .lunaImplementation, .solCIRepair, .solHighUnblock, .committingCandidate:
+      .develop
+    case .prFast, .solPRFastRepair:
+      .validate
+    case .solReview, .solReviewRepair, .lunaVerification:
+      .review
+    case .publishingBranch, .creatingPR, .verifyingExactHead, .mergingPR, .closingIssue,
+      .completed, .blocked, .failed, .stoppedNoChange:
+      .publish
+    }
+  }
+
+  public var isTerminal: Bool {
+    switch self {
+    case .completed, .blocked, .failed, .stoppedNoChange: true
+    default: false
+    }
+  }
+}
+
+public struct AutomationRuntimeStatus: Codable, Equatable, Sendable {
+  public let schemaVersion: Int
+  public let formatVersion: String
+  public let repository: String
+  public let runID: String
+  public let issueNumber: Int
+  public let pullRequestNumber: Int?
+  public let mode: AutomationRuntimeMode
+  public let phase: AutomationRuntimePhase
+  public let lastActivePhase: AutomationRuntimePhase?
+  public let outcome: AutomationRuntimeOutcome
+  public let model: AutomationRuntimeModel?
+  public let role: AutomationRuntimeRole?
+  public let roundNumber: Int?
+  public let totalRounds: Int?
+  public let repairAttempt: Int?
+  public let runnerPID: Int32
+  public let sequence: Int
+  public let startedAt: Date
+  public let phaseStartedAt: Date
+  public let updatedAt: Date
+  public let baseSHA: String?
+  public let headSHA: String?
+
+  public init(
+    schemaVersion: Int = 1,
+    formatVersion: String = "moment.automation-runtime.v1",
+    repository: String,
+    runID: String,
+    issueNumber: Int,
+    pullRequestNumber: Int? = nil,
+    mode: AutomationRuntimeMode,
+    phase: AutomationRuntimePhase,
+    lastActivePhase: AutomationRuntimePhase? = nil,
+    outcome: AutomationRuntimeOutcome = .active,
+    model: AutomationRuntimeModel? = nil,
+    role: AutomationRuntimeRole? = nil,
+    roundNumber: Int? = nil,
+    totalRounds: Int? = nil,
+    repairAttempt: Int? = nil,
+    runnerPID: Int32,
+    sequence: Int,
+    startedAt: Date,
+    phaseStartedAt: Date,
+    updatedAt: Date,
+    baseSHA: String? = nil,
+    headSHA: String? = nil
+  ) {
+    self.schemaVersion = schemaVersion
+    self.formatVersion = formatVersion
+    self.repository = repository
+    self.runID = runID
+    self.issueNumber = issueNumber
+    self.pullRequestNumber = pullRequestNumber
+    self.mode = mode
+    self.phase = phase
+    self.lastActivePhase = lastActivePhase
+    self.outcome = outcome
+    self.model = model
+    self.role = role
+    self.roundNumber = roundNumber
+    self.totalRounds = totalRounds
+    self.repairAttempt = repairAttempt
+    self.runnerPID = runnerPID
+    self.sequence = sequence
+    self.startedAt = startedAt
+    self.phaseStartedAt = phaseStartedAt
+    self.updatedAt = updatedAt
+    self.baseSHA = baseSHA
+    self.headSHA = headSHA
+  }
+
+  public var phaseDetail: String? {
+    if let roundNumber, let totalRounds {
+      return "round \(roundNumber) of \(totalRounds)"
+    }
+    if let repairAttempt {
+      return "repair attempt \(repairAttempt)"
+    }
+    return nil
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case schemaVersion = "schema_version"
+    case formatVersion = "format_version"
+    case repository
+    case runID = "run_id"
+    case issueNumber = "issue_number"
+    case pullRequestNumber = "pull_request_number"
+    case mode
+    case phase
+    case lastActivePhase = "last_active_phase"
+    case outcome
+    case model
+    case role
+    case roundNumber = "round_number"
+    case totalRounds = "total_rounds"
+    case repairAttempt = "repair_attempt"
+    case runnerPID = "runner_pid"
+    case sequence
+    case startedAt = "started_at"
+    case phaseStartedAt = "phase_started_at"
+    case updatedAt = "updated_at"
+    case baseSHA = "base_sha"
+    case headSHA = "head_sha"
+  }
+}
+
+public enum AutomationRuntimeAvailability: String, Codable, Sendable {
+  case absent
+  case live
+  case terminal
+  case stale
+  case invalid
+}
+
+public struct AutomationRuntimeObservation: Codable, Equatable, Sendable {
+  public let availability: AutomationRuntimeAvailability
+  public let status: AutomationRuntimeStatus?
+  public let message: String?
+
+  public init(
+    availability: AutomationRuntimeAvailability,
+    status: AutomationRuntimeStatus? = nil,
+    message: String? = nil
+  ) {
+    self.availability = availability
+    self.status = status
+    self.message = message
+  }
+
+  public static let absent = Self(availability: .absent)
+
+  public static func live(_ status: AutomationRuntimeStatus) -> Self {
+    Self(availability: .live, status: status)
+  }
+
+  public static func terminal(_ status: AutomationRuntimeStatus, message: String? = nil) -> Self {
+    Self(availability: .terminal, status: status, message: message)
+  }
+
+  public static func stale(_ status: AutomationRuntimeStatus, message: String) -> Self {
+    Self(availability: .stale, status: status, message: message)
+  }
+
+  public static func invalid(_ message: String) -> Self {
+    Self(availability: .invalid, message: message)
+  }
+}
