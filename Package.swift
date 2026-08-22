@@ -13,6 +13,7 @@ let package = Package(
   targets: [
     .target(
       name: "MomentMonitorCore",
+      resources: [.process("MobileDashboard")],
       swiftSettings: [
         .enableUpcomingFeature("StrictConcurrency")
       ]
