@@ -106,6 +106,14 @@ swift test
 
 核心 model、GitHub decoding、依賴 parser、run correlation 與 state builder 可跨平台測試；SwiftUI menu-bar UI 僅在 macOS 編譯。最新驗證範圍見 [`docs/VALIDATION.md`](docs/VALIDATION.md)。
 
+## 維護方式
+
+- `main` 必須維持可建置、可安裝；功能與修正使用短期 branch 和 pull request。
+- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、30 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
+- CI 只使用 synthetic fixtures，不配置 Moment repository credential，也不執行 live refresh。
+- 發布版本使用 `v0.1.x` tag；Developer ID 與 notarization 完成前，維持 private repository 與本機 installer 發布方式。
+- Moment repository 不保存此 app 的 source copy，也不把它設為 automation dependency。
+
 ## 第一版限制
 
 - 使用 polling，預設每 30 秒更新；沒有 webhook 或背景 server。

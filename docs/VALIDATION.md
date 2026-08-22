@@ -1,6 +1,6 @@
 # Validation
 
-## Completed on the macOS handoff runner
+## Completed before and after standalone repository extraction
 
 ```text
 macOS 26.6.2 / Apple Silicon arm64

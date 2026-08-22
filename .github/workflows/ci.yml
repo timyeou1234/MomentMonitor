@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: macos-14
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Validate source
+        run: |
+          swift build -Xswiftc -warnings-as-errors
+          swift test -Xswiftc -warnings-as-errors
+          bash -n Scripts/check_read_only.sh Scripts/package_app.sh Scripts/install_app.sh
+          ./Scripts/check_read_only.sh
+          git diff --check
+
+      - name: Build app bundle
+        run: |
+          ./Scripts/package_app.sh
+          test -x "dist/Moment Monitor.app/Contents/MacOS/MomentMonitor"
+          test -f "dist/MomentMonitor.zip"
+          plutil -lint "dist/Moment Monitor.app/Contents/Info.plist"
+          codesign --verify --deep --strict "dist/Moment Monitor.app"
+
+      - name: Upload app archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: MomentMonitor-${{ github.sha }}
+          path: dist/MomentMonitor.zip
+          if-no-files-found: error
+          retention-days: 14
