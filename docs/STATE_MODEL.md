@@ -11,6 +11,12 @@
 | Blocked | Open Issue + `dev-blocked` | Automation explicitly stopped this Issue. |
 | Completed | Merged automation PR + closed Issue | PR has `merged_at`, body/title resolves the originating Issue, and that Issue is closed. |
 
+## Project progress
+
+`Project progress` 的分母是目前各 lane 能解析到 Issue number 的工作，加上完整歷史中符合 Completed 定義的 Issue number；分子只包含 Completed，兩者都以 Issue number 去重。
+
+這個數字刻意不包含沒有 Issue 關聯的 scheduler run，也不會把 workflow success、open PR 或畫面上受設定截斷的 Completed rows 誤當成完成。它描述 tracked automation scope，不代表未進入 automation lifecycle 的整個產品 roadmap。
+
 ## Workflow relevance
 
 目前 trusted controller 在本機執行，不會把內部 step 或 token 資料發布到 GitHub。下列已知 workflow path 只在最近 100 筆 run 中作為向後相容的補充 context；它們不是 viewer 正常工作的依賴：

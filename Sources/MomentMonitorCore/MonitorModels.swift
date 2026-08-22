@@ -103,15 +103,48 @@ public enum MonitorHealth: String, Codable, Sendable {
   case attention
 }
 
+public struct ProjectProgress: Codable, Equatable, Sendable {
+  public let completedCount: Int
+  public let totalCount: Int
+
+  public init(completedCount: Int, totalCount: Int) {
+    let normalizedCompleted = max(0, completedCount)
+    self.completedCount = normalizedCompleted
+    self.totalCount = max(normalizedCompleted, totalCount)
+  }
+
+  public static let empty = Self(completedCount: 0, totalCount: 0)
+
+  public var fractionCompleted: Double {
+    guard self.totalCount > 0 else { return 0 }
+    return Double(self.completedCount) / Double(self.totalCount)
+  }
+
+  public var percentage: Int {
+    Int((self.fractionCompleted * 100).rounded())
+  }
+
+  public var isComplete: Bool {
+    self.totalCount > 0 && self.completedCount == self.totalCount
+  }
+}
+
 public struct MomentMonitorSnapshot: Codable, Equatable, Sendable {
   public let repository: RepositoryCoordinate
   public let generatedAt: Date
   public let items: [MonitorItem]
+  public let projectProgress: ProjectProgress
 
-  public init(repository: RepositoryCoordinate, generatedAt: Date, items: [MonitorItem]) {
+  public init(
+    repository: RepositoryCoordinate,
+    generatedAt: Date,
+    items: [MonitorItem],
+    projectProgress: ProjectProgress = .empty
+  ) {
     self.repository = repository
     self.generatedAt = generatedAt
     self.items = items
+    self.projectProgress = projectProgress
   }
 
   public static func empty(repository: RepositoryCoordinate, at date: Date = Date()) -> Self {

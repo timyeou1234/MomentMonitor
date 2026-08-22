@@ -21,6 +21,12 @@
       VStack(spacing: 0) {
         self.header
         Divider()
+        ProjectProgressView(
+          progress: self.store.snapshot.projectProgress,
+          isLoaded: self.store.hasSuccessfulRefresh,
+          isRefreshing: self.store.isRefreshing
+        )
+        Divider()
 
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 14) {
@@ -49,7 +55,7 @@
           }
           .padding(14)
         }
-        .frame(width: 440, height: 590)
+        .frame(width: 440, height: 520)
 
         Divider()
         self.footer

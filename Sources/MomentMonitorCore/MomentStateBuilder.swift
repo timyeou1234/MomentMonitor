@@ -95,17 +95,28 @@ public struct MomentStateBuilder: Sendable {
         issues: issueItems,
         latestRunByIssue: latestRunByIssue
       ))
+    let completedPullRequestByIssue = Self.completedPullRequestByIssue(
+      pullRequests: automationPullRequests,
+      issueByNumber: issueByNumber
+    )
     items.append(
       contentsOf: self.completedItems(
-        pullRequests: automationPullRequests,
+        pullRequestByIssue: completedPullRequestByIssue,
         issueByNumber: issueByNumber,
         limit: configuration.completedItemLimit
       ))
 
+    let completedIssueNumbers = Set(completedPullRequestByIssue.keys)
+    let trackedIssueNumbers = Set(items.compactMap(\.issueNumber)).union(completedIssueNumbers)
+
     return MomentMonitorSnapshot(
       repository: configuration.repository,
       generatedAt: self.now,
-      items: Self.sort(items)
+      items: Self.sort(items),
+      projectProgress: ProjectProgress(
+        completedCount: completedIssueNumbers.count,
+        totalCount: trackedIssueNumbers.count
+      )
     )
   }
 
@@ -439,24 +450,25 @@ public struct MomentStateBuilder: Sendable {
   }
 
   private func completedItems(
-    pullRequests: [GitHubPullRequest],
+    pullRequestByIssue: [Int: GitHubPullRequest],
     issueByNumber: [Int: GitHubIssue],
     limit: Int
   ) -> [MonitorItem] {
-    pullRequests
-      .filter { pullRequest in
-        guard pullRequest.isMerged,
-          let issueNumber = RunCorrelation.issueNumber(from: pullRequest),
-          let issue = issueByNumber[issueNumber]
-        else { return false }
-        return !issue.isOpen
+    let completed = pullRequestByIssue.map {
+      (issueNumber: $0.key, pullRequest: $0.value)
+    }
+
+    return
+      completed
+      .sorted {
+        ($0.pullRequest.mergedAt ?? .distantPast)
+          > ($1.pullRequest.mergedAt ?? .distantPast)
       }
-      .sorted { ($0.mergedAt ?? .distantPast) > ($1.mergedAt ?? .distantPast) }
       .prefix(limit)
-      .compactMap { pullRequest in
-        guard let issueNumber = RunCorrelation.issueNumber(from: pullRequest),
-          let issue = issueByNumber[issueNumber]
-        else { return nil }
+      .compactMap { pair in
+        let issueNumber = pair.issueNumber
+        let pullRequest = pair.pullRequest
+        guard let issue = issueByNumber[issueNumber] else { return nil }
         let mergedAt = pullRequest.mergedAt ?? pullRequest.updatedAt
         return MonitorItem(
           id: "completed:pr:\(pullRequest.number)",
@@ -474,6 +486,25 @@ public struct MomentStateBuilder: Sendable {
           sequenceNumber: issueNumber
         )
       }
+  }
+
+  private static func completedPullRequestByIssue(
+    pullRequests: [GitHubPullRequest],
+    issueByNumber: [Int: GitHubIssue]
+  ) -> [Int: GitHubPullRequest] {
+    var result: [Int: GitHubPullRequest] = [:]
+    for pullRequest in pullRequests.sorted(by: {
+      ($0.mergedAt ?? .distantPast) > ($1.mergedAt ?? .distantPast)
+    }) {
+      guard pullRequest.isMerged,
+        let issueNumber = RunCorrelation.issueNumber(from: pullRequest),
+        let issue = issueByNumber[issueNumber],
+        !issue.isOpen,
+        result[issueNumber] == nil
+      else { continue }
+      result[issueNumber] = pullRequest
+    }
+    return result
   }
 
   private static func latestRunByIssue(from runs: [GitHubWorkflowRun]) -> [Int: GitHubWorkflowRun] {
