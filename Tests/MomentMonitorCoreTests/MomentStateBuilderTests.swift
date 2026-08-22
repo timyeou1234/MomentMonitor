@@ -8,7 +8,7 @@ final class MomentStateBuilderTests: XCTestCase {
   func testBuildsEveryMomentsLaneWithoutTreatingWorkflowSuccessAsCompletion() {
     let issues = [
       issue(262, title: "Live environment", labels: []),
-      issue(292, title: "Begin production", labels: ["dev-ready", "priority:high"]),
+      issue(292, title: "Begin production", labels: ["dev-ready"]),
       issue(
         293, title: "Live AI boundary", labels: ["dev-ready"],
         body: "<!-- moment:depends-on 262 -->"),
@@ -77,7 +77,7 @@ final class MomentStateBuilderTests: XCTestCase {
     XCTAssertTrue(snapshot.items(in: .prChecks).isEmpty)
   }
 
-  func testReadyQueueUsesSchedulerPriorityThenIssueNumber() {
+  func testReadyQueueMatchesSchedulerIssueNumberOrdering() {
     let issues = [
       issue(20, title: "Default", labels: ["dev-ready"]),
       issue(30, title: "High later", labels: ["dev-ready", "priority:high"]),
@@ -92,25 +92,28 @@ final class MomentStateBuilderTests: XCTestCase {
       workflowRuns: []
     )
 
-    XCTAssertEqual(snapshot.items(in: .ready).compactMap(\.issueNumber), [10, 30, 15, 20])
+    XCTAssertEqual(snapshot.items(in: .ready).compactMap(\.issueNumber), [10, 15, 20, 30])
   }
 
-  func testStaleDevRunningWithoutVisibleRunIsWarning() {
-    let stale = issue(
+  func testLocalDevRunningWithoutVisibleWorkflowRemainsTruthfullyActive() {
+    let local = issue(
       400,
-      title: "Stale task",
+      title: "Local task",
       labels: ["dev-running"],
       updatedAt: fixedDate("2026-08-21T13:00:00Z")
     )
     let snapshot = MomentStateBuilder(now: self.now).build(
       configuration: MonitorConfiguration(),
-      issues: [stale],
+      issues: [local],
       pullRequests: [],
       workflowRuns: []
     )
 
-    XCTAssertEqual(snapshot.items(in: .running).first?.severity, .warning)
-    XCTAssertEqual(snapshot.health, .attention)
+    let item = snapshot.items(in: .running).first
+    XCTAssertEqual(item?.severity, .active)
+    XCTAssertEqual(item?.statusText, "running")
+    XCTAssertTrue(item?.detail.contains("not published to GitHub") == true)
+    XCTAssertEqual(snapshot.health, .busy)
   }
   func testClosedUnmergedPRWithDevPROpenIsVisibleAsWarning() {
     let trackedIssue = issue(500, title: "Inconsistent PR state", labels: ["dev-pr-open"])
@@ -154,10 +157,21 @@ final class MomentStateBuilderTests: XCTestCase {
 
   func testPullRequestTargetReviewRunCorrelatesThroughPRToIssueWithoutDuplicatePRLane() {
     let issues = [issue(237, title: "Backend gateway", labels: ["dev-pr-open"])]
-    let prs = [pullRequest(312, title: "Implement #237: Backend gateway", issueNumber: 237)]
+    let pullRequestHead = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    let prs = [
+      pullRequest(
+        312,
+        title: "Implement #237: Backend gateway",
+        issueNumber: 237,
+        headSha: pullRequestHead
+      )
+    ]
     let reviewRun = workflowRun(
       700, kind: .localTask, status: "in_progress", pullRequestNumber: 312,
-      event: "pull_request_target")
+      event: "pull_request_target",
+      headSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      pullRequestHeadSha: pullRequestHead
+    )
 
     let snapshot = MomentStateBuilder(now: self.now).build(
       configuration: MonitorConfiguration(),
@@ -253,6 +267,27 @@ final class MomentStateBuilderTests: XCTestCase {
     )
 
     XCTAssertEqual(snapshot.items(in: .ready).compactMap(\.issueNumber), [720])
+  }
+
+  func testCurrentRepairAttemptLabelsAreRenderedWithoutClaimingSuccess() {
+    let trackedIssue = issue(730, title: "Repairing", labels: ["dev-pr-open"])
+    let repairedPR = pullRequest(
+      731,
+      title: "Implement #730: Repairing",
+      issueNumber: 730,
+      labels: ["automation-managed", "auto-merge", "automation-repair-3"]
+    )
+
+    let snapshot = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [trackedIssue],
+      pullRequests: [repairedPR],
+      workflowRuns: []
+    )
+
+    let item = snapshot.items(in: .prChecks).first
+    XCTAssertTrue(item?.detail.contains("3 bounded repair attempts used") == true)
+    XCTAssertFalse(item?.detail.localizedCaseInsensitiveContains("passed") == true)
   }
 
 }

@@ -28,7 +28,8 @@ public struct MomentMonitorService: Sendable {
 
     let activeRuns = workflowRuns.filter { run in
       guard WorkflowKind.isRelevant(run) else { return false }
-      return ["queued", "waiting", "pending", "requested", "in_progress"].contains(run.status)
+      let status = run.status.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+      return ["queued", "waiting", "pending", "requested", "in_progress"].contains(status)
     }
 
     let jobsByRunID = try await withThrowingTaskGroup(

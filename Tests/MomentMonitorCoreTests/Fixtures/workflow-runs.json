@@ -17,7 +17,20 @@
       "updated_at": "2026-08-21T12:01:00Z",
       "run_started_at": "2026-08-21T12:00:30Z",
       "html_url": "https://github.com/timyeou1234/Moment/actions/runs/1001",
-      "actor": {"login": "github-actions[bot]"}
+      "actor": {"login": "github-actions[bot]"},
+      "pull_requests": [
+        {
+          "number": 312,
+          "head": {
+            "ref": "automation/issue-294-1001",
+            "sha": "0123456789012345678901234567890123456789"
+          },
+          "base": {
+            "ref": "main",
+            "sha": "abcdefabcdefabcdefabcdefabcdefabcdefabcd"
+          }
+        }
+      ]
     }
   ]
 }

@@ -107,8 +107,8 @@
 
         Spacer()
 
-        Button("Actions") {
-          self.store.openRepositoryActions()
+        Button("GitHub") {
+          self.store.openRepository()
         }
         .buttonStyle(.borderless)
 

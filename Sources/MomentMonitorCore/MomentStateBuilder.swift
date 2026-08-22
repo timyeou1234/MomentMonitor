@@ -75,8 +75,7 @@ public struct MomentStateBuilder: Sendable {
     items.append(
       contentsOf: self.inferredRunningItems(
         issues: issueItems,
-        activeIssueNumbers: activeLocalIssueNumbers.union(activeIssueNumbersFromPullRequestRuns),
-        latestRunByIssue: latestRunByIssue
+        activeIssueNumbers: activeLocalIssueNumbers.union(activeIssueNumbersFromPullRequestRuns)
       ))
     items.append(
       contentsOf: self.pullRequestItems(
@@ -131,23 +130,19 @@ public struct MomentStateBuilder: Sendable {
         in: issue.body,
         openIssueNumbers: openIssueNumbers
       )
-      let priority = Self.priorityRank(labels: labels)
-      let priorityText = Self.priorityText(rank: priority)
 
       if dependencies.isEmpty {
-        let prefix = priorityText.map { "\($0) · " } ?? ""
         return MonitorItem(
           id: "ready:issue:\(issue.number)",
           lane: .ready,
           source: .issue,
           title: "#\(issue.number) \(issue.title)",
-          detail: "\(prefix)Eligible for the scheduler",
+          detail: "Eligible for the scheduler",
           statusText: "ready",
           issueNumber: issue.number,
           url: issue.htmlUrl,
           updatedAt: issue.updatedAt,
           severity: .normal,
-          priorityRank: priority,
           sequenceNumber: issue.number
         )
       }
@@ -163,7 +158,6 @@ public struct MomentStateBuilder: Sendable {
         url: issue.htmlUrl,
         updatedAt: issue.updatedAt,
         severity: .normal,
-        priorityRank: priority,
         sequenceNumber: issue.number
       )
     }
@@ -197,8 +191,8 @@ public struct MomentStateBuilder: Sendable {
       switch kind {
       case .localTask:
         if let issue {
-          if let pullRequest, pullRequest.labelNames.contains("automation-ci-repair-1") {
-            title = "Repair #\(issue.number) · PR #\(pullRequest.number)"
+          if let pullRequest, let attempt = Self.repairAttempt(labels: pullRequest.labelNames) {
+            title = "Repair \(attempt) · #\(issue.number) · PR #\(pullRequest.number)"
           } else {
             title = "#\(issue.number) \(issue.title)"
           }
@@ -248,8 +242,7 @@ public struct MomentStateBuilder: Sendable {
 
   private func inferredRunningItems(
     issues: [GitHubIssue],
-    activeIssueNumbers: Set<Int>,
-    latestRunByIssue: [Int: GitHubWorkflowRun]
+    activeIssueNumbers: Set<Int>
   ) -> [MonitorItem] {
     issues.compactMap { issue in
       guard issue.isOpen,
@@ -258,27 +251,17 @@ public struct MomentStateBuilder: Sendable {
         !activeIssueNumbers.contains(issue.number)
       else { return nil }
 
-      let age = self.now.timeIntervalSince(issue.updatedAt)
-      let isStale = age > 10 * 60
-      let latest = latestRunByIssue[issue.number]
-      let latestText: String
-      if let latest {
-        latestText = "Latest run: \(latest.conclusion ?? latest.status)"
-      } else {
-        latestText = "No matching run is visible yet"
-      }
-
       return MonitorItem(
         id: "running:inferred:\(issue.number)",
         lane: .running,
         source: .inferredState,
         title: "#\(issue.number) \(issue.title)",
-        detail: "dev-running is set · \(latestText)",
-        statusText: isStale ? "check state" : "dispatching",
+        detail: "dev-running is set · runner details are local and are not published to GitHub",
+        statusText: "running",
         issueNumber: issue.number,
         url: issue.htmlUrl,
         updatedAt: issue.updatedAt,
-        severity: isStale ? .warning : .active,
+        severity: .active,
         sequenceNumber: issue.number
       )
     }
@@ -306,7 +289,7 @@ public struct MomentStateBuilder: Sendable {
       }
       let status = latestRun?.conclusion ?? latestRun?.status
       let isFailure = RunCorrelation.isFailureConclusion(latestRun?.conclusion)
-      let hasRepair = pullRequest.labelNames.contains("automation-ci-repair-1")
+      let repairAttempt = Self.repairAttempt(labels: pullRequest.labelNames)
       let reconciliationAge = self.now.timeIntervalSince(
         latestRun?.updatedAt ?? pullRequest.updatedAt)
       let isStaleReconciliation = reconciliationAge > 5 * 60
@@ -315,14 +298,17 @@ public struct MomentStateBuilder: Sendable {
       let statusText: String
       let severity: MonitorSeverity
       if isFailure {
-        detail =
-          hasRepair
-          ? "Issue #\(issueNumber.map(String.init) ?? "?") · workflow failed after the bounded repair path"
-          : "Issue #\(issueNumber.map(String.init) ?? "?") · PR Fast workflow failed"
+        if let repairAttempt {
+          detail =
+            "Issue #\(issueNumber.map(String.init) ?? "?") · workflow failed after repair attempt \(repairAttempt)"
+        } else {
+          detail = "Issue #\(issueNumber.map(String.init) ?? "?") · PR Fast workflow failed"
+        }
         statusText = status ?? "failure"
         severity = .warning
-      } else if hasRepair {
-        detail = "One bounded repair was used · reconciling the repaired head"
+      } else if let repairAttempt {
+        let noun = repairAttempt == 1 ? "attempt" : "attempts"
+        detail = "\(repairAttempt) bounded repair \(noun) used · reconciling the repaired head"
         statusText = isStaleReconciliation ? "check state" : "repair path"
         severity = isStaleReconciliation ? .warning : .normal
       } else if Self.normalized(latestRun?.status) == "completed" {
@@ -502,7 +488,9 @@ public struct MomentStateBuilder: Sendable {
     return result
   }
 
-  private static func prFastRunsByPullRequest(from runs: [GitHubWorkflowRun]) -> [Int: [GitHubWorkflowRun]] {
+  private static func prFastRunsByPullRequest(
+    from runs: [GitHubWorkflowRun]
+  ) -> [Int: [GitHubWorkflowRun]] {
     var result: [Int: [GitHubWorkflowRun]] = [:]
     for run in runs where WorkflowKind.classify(run) == .prFast {
       guard let pullRequestNumber = RunCorrelation.pullRequestNumber(from: run) else { continue }
@@ -515,6 +503,12 @@ public struct MomentStateBuilder: Sendable {
     _ run: GitHubWorkflowRun,
     _ pullRequest: GitHubPullRequest
   ) -> Bool {
+    if WorkflowKind.classify(run) == .localTask,
+      run.event?.caseInsensitiveCompare("pull_request_target") == .orderedSame
+    {
+      return run.pullRequests?.first(where: { $0.number == pullRequest.number })?.head.sha
+        == pullRequest.head.sha
+    }
     guard let runHeadSha = run.headSha else { return false }
     return runHeadSha == pullRequest.head.sha
   }
@@ -542,18 +536,15 @@ public struct MomentStateBuilder: Sendable {
     status?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
   }
 
-  private static func priorityRank(labels: Set<String>) -> Int {
-    if labels.contains("priority:high") { return 0 }
-    if labels.contains("priority:medium") { return 1 }
-    return 2
-  }
-
-  private static func priorityText(rank: Int) -> String? {
-    switch rank {
-    case 0: "High priority"
-    case 1: "Medium priority"
-    default: nil
+  private static func repairAttempt(labels: Set<String>) -> Int? {
+    for attempt in stride(from: 3, through: 1, by: -1) {
+      if labels.contains("automation-repair-\(attempt)")
+        || labels.contains("automation-ci-repair-\(attempt)")
+      {
+        return attempt
+      }
     }
+    return nil
   }
 
   private static func sort(_ items: [MonitorItem]) -> [MonitorItem] {
@@ -564,9 +555,6 @@ public struct MomentStateBuilder: Sendable {
 
       switch lhs.lane {
       case .ready, .waiting:
-        if lhs.priorityRank != rhs.priorityRank {
-          return lhs.priorityRank < rhs.priorityRank
-        }
         return lhs.sequenceNumber < rhs.sequenceNumber
       case .queued, .running:
         if lhs.updatedAt != rhs.updatedAt {

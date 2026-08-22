@@ -70,10 +70,13 @@ public struct GitHubCLIClient: GitHubReading, Sendable {
     -> [GitHubWorkflowRun]
   {
     let endpoint = "repos/\(repository.fullName)/actions/runs?per_page=100"
-    let data = try await self.apiGET(endpoint: endpoint, paginate: true)
+    // The repository can accumulate thousands of historical runs. Asking `gh api
+    // --paginate` for the entire history routinely exceeds the command timeout and
+    // prevents every other lane from refreshing. Active runs are newest-first, so
+    // one maximum-sized page is the bounded source of workflow context.
+    let data = try await self.apiGET(endpoint: endpoint, paginate: false)
     do {
-      return try Self.decodePages(GitHubWorkflowRunsPage.self, from: data)
-        .flatMap { $0.workflowRuns }
+      return try JSONDecoder.github.decode(GitHubWorkflowRunsPage.self, from: data).workflowRuns
     } catch {
       throw MomentMonitorError.invalidResponse(
         "Workflow runs could not be decoded: \(error.localizedDescription)")
@@ -85,10 +88,11 @@ public struct GitHubCLIClient: GitHubReading, Sendable {
     runID: Int64
   ) async throws -> [GitHubWorkflowJob] {
     let endpoint = "repos/\(repository.fullName)/actions/runs/\(runID)/jobs?per_page=100"
-    let data = try await self.apiGET(endpoint: endpoint, paginate: true)
+    // A relevant run has far fewer than 100 jobs. Keep this request bounded for
+    // the same reason as workflow runs instead of traversing unrelated history.
+    let data = try await self.apiGET(endpoint: endpoint, paginate: false)
     do {
-      return try Self.decodePages(GitHubWorkflowJobsPage.self, from: data)
-        .flatMap { $0.jobs }
+      return try JSONDecoder.github.decode(GitHubWorkflowJobsPage.self, from: data).jobs
     } catch {
       throw MomentMonitorError.invalidResponse(
         "Workflow jobs could not be decoded: \(error.localizedDescription)")
@@ -128,18 +132,6 @@ public struct GitHubCLIClient: GitHubReading, Sendable {
       arguments.append(contentsOf: ["--paginate", "--slurp"])
     }
     return arguments
-  }
-
-  private static func decodePages<Page: Decodable>(
-    _ type: Page.Type,
-    from data: Data
-  ) throws -> [Page] {
-    do {
-      return try JSONDecoder.github.decode([Page].self, from: data)
-    } catch {
-      // Keep single-page responses useful for callers using a gh-compatible test double.
-      return [try JSONDecoder.github.decode(Page.self, from: data)]
-    }
   }
 
   private static let commandEnvironment: [String: String] = [

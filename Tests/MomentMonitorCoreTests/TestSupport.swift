@@ -79,7 +79,8 @@ func workflowRun(
   pullRequestNumber: Int? = nil,
   event: String = "workflow_dispatch",
   createdAt: Date = fixedDate("2026-08-21T12:00:00Z"),
-  headSha: String = "0123456789012345678901234567890123456789"
+  headSha: String = "0123456789012345678901234567890123456789",
+  pullRequestHeadSha: String? = nil
 ) -> GitHubWorkflowRun {
   let name: String
   let displayTitle: String
@@ -121,6 +122,19 @@ func workflowRun(
     updatedAt: createdAt,
     runStartedAt: status == "in_progress" ? createdAt : nil,
     htmlUrl: URL(string: "https://github.com/timyeou1234/Moment/actions/runs/\(id)")!,
-    actor: GitHubUser(login: "github-actions[bot]")
+    actor: GitHubUser(login: "github-actions[bot]"),
+    pullRequests: pullRequestNumber.map { number in
+      [
+        GitHubWorkflowPullRequest(
+          number: number,
+          head: GitHubGitReference(
+            ref: "automation/issue-\(issueNumber ?? 0)",
+            sha: pullRequestHeadSha ?? headSha
+          ),
+          base: GitHubGitReference(
+            ref: "main", sha: "abcdefabcdefabcdefabcdefabcdefabcdefabcd")
+        )
+      ]
+    } ?? []
   )
 }

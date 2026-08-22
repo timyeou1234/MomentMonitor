@@ -4,34 +4,40 @@ import XCTest
 @testable import MomentMonitorCore
 
 final class GitHubCLIClientTests: XCTestCase {
-  func testWorkflowRunsAndJobsRequestAllPages() async throws {
+  func testIssuesAndPullRequestsPaginateWhileWorkflowContextStaysBounded() async throws {
+    let issuePages = try fixtureJSON("issues-pages")
     let runsPage = try fixtureJSON("workflow-runs")
     let jobsPage = try fixtureJSON("workflow-jobs")
-    let runner = CommandRunnerStub(outputs: [paginated(runsPage), paginated(jobsPage)])
+    let runner = CommandRunnerStub(
+      outputs: [issuePages, Data("[[]]".utf8), runsPage, jobsPage])
     let client = GitHubCLIClient(
       executable: URL(fileURLWithPath: "/usr/bin/gh"),
       runner: runner
     )
 
+    let issues = try await client.fetchIssues(repository: .moment)
+    let pullRequests = try await client.fetchPullRequests(repository: .moment)
     let runs = try await client.fetchWorkflowRuns(repository: .moment)
     let jobs = try await client.fetchWorkflowJobs(repository: .moment, runID: 1)
 
-    XCTAssertEqual(runs.count, 2)
-    XCTAssertEqual(jobs.count, 2)
+    XCTAssertEqual(issues.count, 1)
+    XCTAssertTrue(pullRequests.isEmpty)
+    XCTAssertEqual(runs.count, 1)
+    XCTAssertEqual(jobs.count, 1)
     let calls = await runner.calls
-    XCTAssertEqual(calls.count, 2)
-    XCTAssertTrue(
-      calls.allSatisfy {
-        $0.arguments.contains("--paginate") && $0.arguments.contains("--slurp")
-      })
+    XCTAssertEqual(calls.count, 4)
+    XCTAssertTrue(calls[0].arguments.contains("--paginate"))
+    XCTAssertTrue(calls[0].arguments.contains("--slurp"))
+    XCTAssertTrue(calls[1].arguments.contains("--paginate"))
+    XCTAssertTrue(calls[1].arguments.contains("--slurp"))
+    XCTAssertFalse(calls[2].arguments.contains("--paginate"))
+    XCTAssertFalse(calls[2].arguments.contains("--slurp"))
+    XCTAssertFalse(calls[3].arguments.contains("--paginate"))
+    XCTAssertFalse(calls[3].arguments.contains("--slurp"))
   }
 
   private func fixtureJSON(_ name: String) throws -> Data {
     try fixtureData(name)
-  }
-
-  private func paginated(_ page: Data) -> Data {
-    Data("[\(String(decoding: page, as: UTF8.self)),\(String(decoding: page, as: UTF8.self))]".utf8)
   }
 }
 

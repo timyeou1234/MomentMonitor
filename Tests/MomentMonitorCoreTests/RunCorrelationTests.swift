@@ -23,6 +23,31 @@ final class RunCorrelationTests: XCTestCase {
     XCTAssertEqual(RunCorrelation.pullRequestNumber(from: review), 312)
   }
 
+  func testRESTPullRequestRelationshipWinsOverAmbiguousDisplayTitle() {
+    let run = workflowRun(
+      4,
+      kind: .prFast,
+      status: "queued",
+      pullRequestNumber: 312
+    )
+
+    XCTAssertEqual(RunCorrelation.pullRequestNumber(from: run), 312)
+  }
+
+  func testWorkflowDispatchDoesNotTreatAssociatedCommitPullRequestAsItsTarget() {
+    let run = workflowRun(
+      5,
+      kind: .localTask,
+      status: "queued",
+      issueNumber: 294,
+      pullRequestNumber: 312,
+      event: "workflow_dispatch"
+    )
+
+    XCTAssertEqual(RunCorrelation.issueNumber(from: run), 294)
+    XCTAssertNil(RunCorrelation.pullRequestNumber(from: run))
+  }
+
   func testFindsCurrentWorkflowStep() {
     let job = GitHubWorkflowJob(
       id: 1,

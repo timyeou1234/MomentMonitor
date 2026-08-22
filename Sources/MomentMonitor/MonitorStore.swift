@@ -82,9 +82,9 @@
       Task { await self.refresh() }
     }
 
-    func openRepositoryActions() {
+    func openRepository() {
       guard let coordinate = try? RepositoryCoordinate(parsing: self.repositoryText),
-        let url = URL(string: "https://github.com/\(coordinate.fullName)/actions")
+        let url = URL(string: "https://github.com/\(coordinate.fullName)")
       else { return }
       NSWorkspace.shared.open(url)
     }

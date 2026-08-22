@@ -64,12 +64,19 @@ public enum RunCorrelation {
   public static func pullRequestNumber(from run: GitHubWorkflowRun) -> Int? {
     switch WorkflowKind.classify(run) {
     case .prFast:
+      if let linkedPullRequest = run.pullRequests?.first {
+        return linkedPullRequest.number
+      }
       let source = run.displayTitle ?? run.name
       return self.firstIntegerCapture(pattern: #"#(\d+)"#, in: source)
     case .localTask:
-      guard run.event?.caseInsensitiveCompare("pull_request_target") == .orderedSame,
-        let source = run.displayTitle
-      else { return nil }
+      guard run.event?.caseInsensitiveCompare("pull_request_target") == .orderedSame else {
+        return nil
+      }
+      if let linkedPullRequest = run.pullRequests?.first {
+        return linkedPullRequest.number
+      }
+      guard let source = run.displayTitle else { return nil }
       return self.trailingNumber(in: source)
     case .scheduler, .other:
       return nil

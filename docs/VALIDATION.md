@@ -1,35 +1,47 @@
 # Validation
 
-## Completed in the implementation environment
+## Completed on the macOS handoff runner
 
 ```text
-Swift 6.2.1 / x86_64 Linux
-19 XCTest cases
+macOS 26.6.2 / Apple Silicon arm64
+Xcode 26.6
+Apple Swift 6.3.3
+GitHub CLI 2.97.0
+28 XCTest cases
 0 failures
-strict warnings-as-errors build
-swift-format strict lint
-read-only source scan
-macOS-target syntax parse for every SwiftUI/AppKit source
-shell syntax validation for packaging scripts
 ```
+
+Validated boundaries:
+
+- full Swift package build with warnings as errors;
+- deterministic core tests, including bounded pagination, REST PR/run correlation, scheduler ordering, repair-attempt labels, case-insensitive status handling, Finder-style `gh` lookup, and truthful local-runner state;
+- strict GET-only source scan;
+- Swift format lint and shell syntax;
+- release app bundle, ad-hoc signature, plist, executable, license resources, and zip round-trip;
+- bounded packaged-app launch smoke with a Finder-style minimal `PATH`;
+- authenticated GET-only live refresh against `timyeou1234/Moment`.
 
 Commands:
 
 ```bash
 swift test -Xswiftc -warnings-as-errors
 ./Scripts/check_read_only.sh
-swift-format lint --strict --recursive Sources Tests Package.swift
-swiftc -frontend -parse -target arm64-apple-macosx14.0 Sources/MomentMonitor/*.swift
 bash -n Scripts/check_read_only.sh Scripts/package_app.sh
+xcrun swift-format lint --strict --recursive Sources Tests Package.swift
+./Scripts/package_app.sh
+test -x "dist/Moment Monitor.app/Contents/MacOS/MomentMonitor"
+test -f "dist/MomentMonitor.zip"
+plutil -lint "dist/Moment Monitor.app/Contents/Info.plist"
+codesign --verify --deep --strict "dist/Moment Monitor.app"
+git diff --check
 ```
+
+The live GET-only refresh completed in 5.97 seconds after workflow history was bounded to the newest 100 runs. The previous all-history workflow request was stopped after 34.39 seconds and would have exceeded the app's 20-second command timeout.
 
 ## Deliberately not claimed
 
-The implementation environment is Linux and has no Apple SDK. The macOS code was syntax-parsed for the macOS target, but AppKit/SwiftUI type-checking, signing and launching the final `.app` must run on a Mac:
-
-```bash
-./Scripts/package_app.sh
-open "dist/Moment Monitor.app"
-```
-
-No command in this validation writes to `timyeou1234/Moment`.
+- Developer ID signing, notarization, distribution, auto-update, or App Store readiness;
+- long-duration polling, sleep/wake, network-loss, or credential-expiry soak;
+- exhaustive visual or assistive-technology conformance;
+- visibility into local runner commands, files, model activity, or token usage;
+- any GitHub or Moment automation mutation.

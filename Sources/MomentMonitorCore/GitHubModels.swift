@@ -91,6 +91,18 @@ public struct GitHubGitReference: Codable, Hashable, Sendable {
   }
 }
 
+public struct GitHubWorkflowPullRequest: Codable, Hashable, Sendable {
+  public let number: Int
+  public let head: GitHubGitReference
+  public let base: GitHubGitReference
+
+  public init(number: Int, head: GitHubGitReference, base: GitHubGitReference) {
+    self.number = number
+    self.head = head
+    self.base = base
+  }
+}
+
 public struct GitHubPullRequest: Codable, Hashable, Sendable {
   public let number: Int
   public let title: String
@@ -179,6 +191,7 @@ public struct GitHubWorkflowRun: Codable, Hashable, Sendable {
   public let runStartedAt: Date?
   public let htmlUrl: URL
   public let actor: GitHubUser?
+  public let pullRequests: [GitHubWorkflowPullRequest]?
 
   public init(
     id: Int64,
@@ -196,7 +209,8 @@ public struct GitHubWorkflowRun: Codable, Hashable, Sendable {
     updatedAt: Date,
     runStartedAt: Date? = nil,
     htmlUrl: URL,
-    actor: GitHubUser? = nil
+    actor: GitHubUser? = nil,
+    pullRequests: [GitHubWorkflowPullRequest]? = nil
   ) {
     self.id = id
     self.name = name
@@ -214,6 +228,7 @@ public struct GitHubWorkflowRun: Codable, Hashable, Sendable {
     self.runStartedAt = runStartedAt
     self.htmlUrl = htmlUrl
     self.actor = actor
+    self.pullRequests = pullRequests
   }
 }
 

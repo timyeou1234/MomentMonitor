@@ -17,6 +17,7 @@ final class GitHubJSONTests: XCTestCase {
       GitHubWorkflowJobsPage.self, from: fixtureData("workflow-jobs"))
     XCTAssertEqual(
       runs.workflowRuns.first?.displayTitle, "Moment local task · workflow_dispatch · 294")
+    XCTAssertEqual(runs.workflowRuns.first?.pullRequests?.first?.number, 312)
     XCTAssertEqual(jobs.jobs.first?.steps?.last?.status, "in_progress")
   }
 }

@@ -10,13 +10,13 @@
 
 - **Ready**：owner-authored Issue 具有 `dev-ready` 或 `moment:dev-ready` marker，且直接依賴都已關閉；排序與 scheduler 相同。
 - **Waiting on dependencies**：符合 ready 條件，但 `moment:depends-on` 仍有 open Issue。
-- **Runner queue**：GitHub Actions run 為 `queued`、`waiting`、`pending` 或 `requested`。
-- **Running**：Codex local task、PR Fast 或 scheduler 正在執行；active job 可用時會顯示目前 step。
+- **Runner queue**：若 repository 仍有可見的相關 GitHub Actions run，狀態為 `queued`、`waiting`、`pending` 或 `requested`。
+- **Running**：`dev-running` 表示本機 trusted task 正在執行；本機 runner 細節不會假裝成 GitHub 可觀測資料。若相關 workflow run 可見，才會補充目前 step。
 - **PR / Checks**：locally reviewed automation PR 已開啟，但目前沒有 active run。
 - **Blocked / Failed**：`dev-blocked`，或 repository state 與可見 workflow/PR 不一致。
 - **Completed**：automation PR 確實 `merged_at != nil`，且對應 Issue 已關閉。Workflow success 本身不會被誤當成完成。
 
-點選任何 row 只會開啟對應的 GitHub Issue、PR 或 Actions run。
+點選任何 row 只會開啟對應的 GitHub Issue、PR 或可見的 Actions run。
 
 ## 唯讀邊界
 
@@ -57,6 +57,8 @@ MOMENT_MONITOR_GH_PATH
 PATH 中的 gh
 ```
 
+Issue 與 PR 會完整分頁；workflow history 只讀最新 100 筆，避免已淘汰或長期累積的歷史 run 超過 refresh timeout 而讓整個 viewer 無法更新。
+
 ## 建置與安裝
 
 在 macOS 執行：
@@ -91,7 +93,7 @@ swift test
 - 使用 polling，預設每 30 秒更新；沒有 webhook 或背景 server。
 - 不讀 runner 上的 Codex JSONL，因此不顯示模型正在修改哪個檔案、執行哪個 shell command 或 Token 消耗。
 - 不發送 native notification；先確認狀態判定在實際 Moments repo 上正確，再決定是否加入。
-- 本工作環境可驗證 Swift 6 core 與測試，但不是 macOS，因此 `.app` 的最後一次 Xcode/macOS build 需在你的 Mac 執行。
+- 目前已在 Apple Silicon macOS 以 Swift 6.3.3 / Xcode 26.6 完成 `.app` build、ad-hoc signing、zip 解包與 bounded launch smoke；尚未做 Developer ID notarization 或長時間 polling soak。
 
 ## License 與 attribution
 
