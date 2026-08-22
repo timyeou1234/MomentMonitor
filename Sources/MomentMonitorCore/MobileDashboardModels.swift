@@ -1,7 +1,7 @@
 import Foundation
 
 public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
-  public static let schemaVersion = 1
+  public static let schemaVersion = 2
 
   public let schemaVersion: Int
   public let repository: String

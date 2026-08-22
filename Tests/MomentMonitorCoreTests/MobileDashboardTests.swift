@@ -40,7 +40,7 @@ final class MobileDashboardTests: XCTestCase {
     let decoded = try JSONDecoder.mobileDashboard.decode(MobileDashboardEnvelope.self, from: data)
     let rendered = String(decoding: data, as: UTF8.self)
 
-    XCTAssertEqual(decoded.schemaVersion, 1)
+    XCTAssertEqual(decoded.schemaVersion, 2)
     XCTAssertEqual(decoded.repository, "timyeou1234/Moment")
     XCTAssertEqual(decoded.runtime.phase, .solReview)
     XCTAssertEqual(decoded.runtime.activeStage, .review)

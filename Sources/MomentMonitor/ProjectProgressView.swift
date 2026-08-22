@@ -10,7 +10,7 @@
     var body: some View {
       VStack(alignment: .leading, spacing: 7) {
         HStack {
-          Text("Project progress")
+          Text("M1 progress")
             .font(.subheadline.weight(.semibold))
 
           Spacer()
@@ -43,16 +43,16 @@
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
       .accessibilityElement(children: .ignore)
-      .accessibilityLabel("Project progress")
+      .accessibilityLabel("M1 progress")
       .accessibilityValue(self.accessibilityValue)
       .accessibilityHint(
-        "Counts tracked automation Issues. Completion requires a merged pull request and a closed originating Issue."
+        "Counts closed Issues out of all Issues in the M1 scope."
       )
     }
 
     private var summaryText: String {
       guard self.isLoaded else { return self.isRefreshing ? "Reading…" : "Unavailable" }
-      guard self.progress.totalCount > 0 else { return "No tracked work" }
+      guard self.progress.totalCount > 0 else { return "No M1 Issues" }
       return
         "\(self.progress.completedCount) of \(self.progress.totalCount) · \(self.progress.percentage)%"
     }
@@ -60,18 +60,18 @@
     private var scopeText: String {
       guard self.isLoaded else {
         return self.isRefreshing
-          ? "Reading tracked automation Issues…" : "Available after a successful refresh"
+          ? "Reading M1 Issues…" : "Available after a successful refresh"
       }
-      return "Tracked automation Issues · merged PR + closed Issue"
+      return "Closed M1 Issues · all M1 Issues"
     }
 
     private var accessibilityValue: String {
       guard self.isLoaded else {
         return self.isRefreshing ? "Refreshing" : "Unavailable until refresh succeeds"
       }
-      guard self.progress.totalCount > 0 else { return "No tracked automation Issues" }
+      guard self.progress.totalCount > 0 else { return "No M1 Issues" }
       return
-        "\(self.progress.percentage) percent, \(self.progress.completedCount) of \(self.progress.totalCount) tracked automation Issues completed"
+        "\(self.progress.percentage) percent, \(self.progress.completedCount) of \(self.progress.totalCount) M1 Issues closed"
     }
   }
 #endif
