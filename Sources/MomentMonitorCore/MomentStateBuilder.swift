@@ -132,19 +132,25 @@ public struct MomentStateBuilder: Sendable {
         limit: configuration.completedItemLimit
       ))
 
-    let completedIssueNumbers = Set(completedPullRequestByIssue.keys)
-    let trackedIssueNumbers = Set(items.compactMap(\.issueNumber)).union(completedIssueNumbers)
+    let m1Issues = issueItems.filter(Self.isM1Issue)
+    let closedM1IssueCount = m1Issues.filter { issue in
+      issue.state.caseInsensitiveCompare("closed") == .orderedSame
+    }.count
 
     return MomentMonitorSnapshot(
       repository: configuration.repository,
       generatedAt: self.now,
       items: Self.sort(items),
       projectProgress: ProjectProgress(
-        completedCount: completedIssueNumbers.count,
-        totalCount: trackedIssueNumbers.count
+        completedCount: closedM1IssueCount,
+        totalCount: m1Issues.count
       ),
       runtimeObservation: reconciledRuntimeObservation
     )
+  }
+
+  private static func isM1Issue(_ issue: GitHubIssue) -> Bool {
+    issue.title.range(of: "[M1]", options: [.anchored, .caseInsensitive]) != nil
   }
 
   private func runtimeItem(

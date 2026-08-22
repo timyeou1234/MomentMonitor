@@ -12,11 +12,11 @@
 | Blocked | Open Issue + `dev-blocked` | Automation explicitly stopped this Issue. |
 | Completed | Merged automation PR + closed Issue | PR has `merged_at`, body/title resolves the originating Issue, and that Issue is closed. |
 
-## Project progress
+## M1 progress
 
-`Project progress` 的分母是目前各 lane 能解析到 Issue number 的工作，加上完整歷史中符合 Completed 定義的 Issue number；分子只包含 Completed，兩者都以 Issue number 去重。
+`M1 progress` 的 scope contract 是 GitHub Issue title 以 `[M1]` 開頭（大小寫不敏感）。分母是完整分頁結果中所有符合這個 marker 的非-PR Issues；分子是其中 GitHub state 為 `closed` 的 Issues。
 
-這個數字刻意不包含沒有 Issue 關聯的 scheduler run，也不會把 workflow success、open PR 或畫面上受設定截斷的 Completed rows 誤當成完成。它描述 tracked automation scope，不代表未進入 automation lifecycle 的整個產品 roadmap。
+這個數字刻意不使用 GitHub milestone assignment，因為現有 M1 scope 由 Issue title marker 管理，而 milestone 欄位並未完整套用。它也不依賴 automation lane、workflow、PR 數量或畫面上受設定截斷的 Completed rows。`closed` 包含 GitHub 記錄的所有 closed reasons；這是 repository 的 Issue closure 進度，不宣稱產品或 release 已完成。
 
 ## Local runtime phase
 
@@ -33,7 +33,7 @@ phase/model/role/outcome 都是 `INVALID`。Terminal `completed` 仍須 GitHub �
 merged automation PR + closed originating Issue，否則明示 awaiting confirmation。
 
 Optional phone dashboard 會把同一份 reconciled state 轉成 versioned、sanitized
-的 `schemaVersion: 1` snapshot。它不另外推算 phase 或 completion：精確的 local
+的 `schemaVersion: 2` snapshot。它不另外推算 phase 或 completion：精確的 local
 phase 仍來自通過驗證的 controller record，merged/closed completion 仍由 GitHub 證明。
 
 ## Workflow relevance

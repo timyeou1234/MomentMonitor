@@ -167,10 +167,10 @@ function render() {
   setText("progress-completed", progress.completedCount);
   setText("progress-total", progress.totalCount);
   setText("progress-percent", percentage);
-  setText("progress-copy", progress.totalCount ? "Merged PR and closed Issue are both required." : "No tracked automation Issues yet.");
+  setText("progress-copy", progress.totalCount ? "Closed M1 Issues out of the complete M1 scope." : "No M1 Issues found.");
   const ring = byID("progress-ring");
   ring.style.setProperty("--progress", `${percentage * 3.6}deg`);
-  ring.setAttribute("aria-label", `${percentage}% complete, ${progress.completedCount} of ${progress.totalCount}`);
+  ring.setAttribute("aria-label", `${percentage}% closed, ${progress.completedCount} of ${progress.totalCount} M1 Issues`);
 
   renderRuntime(snapshot.runtime, now);
   renderLanes(snapshot.lanes, now);
@@ -183,7 +183,7 @@ async function poll() {
     const response = await fetch("/api/v1/snapshot", { cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error(`Snapshot request failed: ${response.status}`);
     const snapshot = await response.json();
-    if (snapshot.schemaVersion !== 1) throw new Error("Unsupported snapshot schema");
+    if (snapshot.schemaVersion !== 2) throw new Error("Unsupported snapshot schema");
     state.snapshot = snapshot;
     state.connected = true;
     state.lastSuccess = new Date(snapshot.servedAt);
