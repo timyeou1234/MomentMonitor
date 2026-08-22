@@ -7,20 +7,22 @@ macOS 26.6.2 / Apple Silicon arm64
 Xcode 26.6
 Apple Swift 6.3.3
 GitHub CLI 2.97.0
-30 XCTest cases
+33 XCTest cases
 0 failures
 ```
 
 Validated boundaries:
 
 - full Swift package build with warnings as errors;
-- deterministic core tests, including bounded pagination, REST PR/run correlation, scheduler ordering, repair-attempt labels, case-insensitive status handling, Finder-style `gh` lookup, and truthful local-runner state;
+- deterministic core tests, including bounded pagination, REST PR/run correlation, scheduler ordering, repair-attempt labels, case-insensitive status handling, Finder-style `gh` lookup, truthful local-runner state, and project-progress counting independent of visible row limits;
 - strict GET-only source scan;
 - Swift format lint and shell syntax;
 - release app bundle, ad-hoc signature, plist, executable, license resources, and zip round-trip;
 - bounded packaged-app launch smoke with a Finder-style minimal `PATH`;
 - first install and in-place update through the one-command installer, including staging cleanup;
 - installed-app launch from `~/Applications`, menu-bar popover presence, Settings command, and Settings window presence;
+- project-progress model coverage for visible-row truncation, duplicate merged PRs, and no tracked work;
+- installed v0.2.0 progress-bar rendering, percentage text, and scope disclosure, plus compiled combined accessibility label/value/hint semantics;
 - authenticated GET-only live refresh against `timyeou1234/Moment`.
 
 Commands:
@@ -40,9 +42,11 @@ MOMENT_MONITOR_INSTALL_DIR=/private/tmp/<isolated-test-root> ./Scripts/install_a
 git diff --check
 ```
 
-The isolated installer ran twice against the same destination, proving both first-install and update paths. The final app was then installed, signed, launched, and observed at `~/Applications/Moment Monitor.app`. After the live refresh, macOS Accessibility reported `Moment Monitor, 3 active items` for the status menu; the app menu exposed Settings and Quit; and Core Graphics reported the 440 × 683 status popover and 540 × 444 Settings window.
+The isolated installer ran twice against the same destination, proving both first-install and update paths. The final app was then installed, signed, launched, and observed at `~/Applications/Moment Monitor.app`. After the live refresh, macOS Accessibility reported `Moment Monitor, 3 active items` for the status menu; the app menu exposed Settings and Quit; and Core Graphics reported the v0.2.0 440 × 694 status popover and 540 × 444 Settings window.
 
-The live GET-only refresh completed in 5.97 seconds after workflow history was bounded to the newest 100 runs. The previous all-history workflow request was stopped after 34.39 seconds and would have exceeded the app's 20-second command timeout.
+The v0.2.0 live GET-only refresh calculated 3 completed of 8 tracked automation Issues (38%). Its inputs cross-checked against the rendered lanes: 2 waiting, 1 running, 2 PR/checks, and 3 completed. The visual inspection confirmed that the progress bar, percentage, scope disclosure, scrolling content, and footer remained visible without overlap.
+
+The current live GET-only refresh completed in 4.80 seconds. Workflow history remains bounded to the newest 100 runs; the previous all-history workflow request was stopped after 34.39 seconds and would have exceeded the app's 20-second command timeout.
 
 ## Deliberately not claimed
 

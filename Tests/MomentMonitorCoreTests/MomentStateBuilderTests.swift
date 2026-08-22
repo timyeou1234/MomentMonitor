@@ -59,6 +59,74 @@ final class MomentStateBuilderTests: XCTestCase {
     XCTAssertEqual(snapshot.items(in: .blocked).map(\.issueNumber), [295])
     XCTAssertEqual(snapshot.items(in: .completed).map(\.issueNumber), [296])
     XCTAssertFalse(snapshot.items(in: .completed).contains(where: { $0.issueNumber == 237 }))
+    XCTAssertEqual(snapshot.projectProgress, ProjectProgress(completedCount: 1, totalCount: 6))
+  }
+
+  func testProjectProgressCountsAllCompletedIssuesBeyondTheVisibleCompletedLimit() {
+    let issues = [
+      issue(800, title: "Ready next", labels: ["dev-ready"]),
+      issue(801, title: "Completed one", state: "closed"),
+      issue(802, title: "Completed two", state: "closed"),
+      issue(803, title: "Completed three", state: "closed"),
+    ]
+    let pullRequests = [
+      pullRequest(
+        811, title: "Implement #801: Completed one", state: "closed", issueNumber: 801,
+        mergedAt: fixedDate("2026-08-21T11:00:00Z")),
+      pullRequest(
+        812, title: "Implement #802: Completed two", state: "closed", issueNumber: 802,
+        mergedAt: fixedDate("2026-08-21T12:00:00Z")),
+      pullRequest(
+        813, title: "Implement #803: Completed three", state: "closed", issueNumber: 803,
+        mergedAt: fixedDate("2026-08-21T13:00:00Z")),
+    ]
+
+    let snapshot = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(completedItemLimit: 1),
+      issues: issues,
+      pullRequests: pullRequests,
+      workflowRuns: []
+    )
+
+    XCTAssertEqual(snapshot.items(in: .completed).map(\.issueNumber), [803])
+    XCTAssertEqual(snapshot.projectProgress.completedCount, 3)
+    XCTAssertEqual(snapshot.projectProgress.totalCount, 4)
+    XCTAssertEqual(snapshot.projectProgress.fractionCompleted, 0.75, accuracy: 0.001)
+    XCTAssertEqual(snapshot.projectProgress.percentage, 75)
+  }
+
+  func testProjectProgressDeduplicatesMultipleMergedPullRequestsForOneIssue() {
+    let completedIssue = issue(900, title: "Completed once", state: "closed")
+    let olderPullRequest = pullRequest(
+      901, title: "Implement #900: First head", state: "closed", issueNumber: 900,
+      mergedAt: fixedDate("2026-08-21T11:00:00Z"))
+    let latestPullRequest = pullRequest(
+      902, title: "Implement #900: Follow-up head", state: "closed", issueNumber: 900,
+      mergedAt: fixedDate("2026-08-21T13:00:00Z"))
+
+    let snapshot = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [completedIssue],
+      pullRequests: [olderPullRequest, latestPullRequest],
+      workflowRuns: []
+    )
+
+    XCTAssertEqual(snapshot.projectProgress, ProjectProgress(completedCount: 1, totalCount: 1))
+    XCTAssertEqual(snapshot.items(in: .completed).map(\.pullRequestNumber), [902])
+    XCTAssertTrue(snapshot.projectProgress.isComplete)
+  }
+
+  func testProjectProgressIsEmptyWhenNoAutomationIssueIsTracked() {
+    let snapshot = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [issue(950, title: "Untracked backlog")],
+      pullRequests: [],
+      workflowRuns: []
+    )
+
+    XCTAssertEqual(snapshot.projectProgress, .empty)
+    XCTAssertEqual(snapshot.projectProgress.percentage, 0)
+    XCTAssertFalse(snapshot.projectProgress.isComplete)
   }
 
   func testActivePRFastMovesPRFromChecksToRunnerQueue() {
