@@ -44,7 +44,7 @@ jobs:
           codesign --verify --deep --strict "dist/Moment Monitor.app"
 
       - name: Upload app archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: MomentMonitor-${{ github.sha }}
           path: dist/MomentMonitor.zip
