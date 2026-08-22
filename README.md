@@ -111,7 +111,7 @@ swift test
 - `main` 必須維持可建置、可安裝；功能與修正使用短期 branch 和 pull request。
 - 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、30 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
 - CI 只使用 synthetic fixtures，不配置 Moment repository credential，也不執行 live refresh。
-- 發布版本使用 `v0.1.x` tag；Developer ID 與 notarization 完成前，維持 private repository 與本機 installer 發布方式。
+- 發布版本使用 `v0.1.x` tag；source 保持公開，但 Developer ID 與 notarization 完成前仍以本機 installer 安裝，不把 ad-hoc signed CI artifact 描述為可公開散佈的正式版本。
 - Moment repository 不保存此 app 的 source copy，也不把它設為 automation dependency。
 
 ## 第一版限制
