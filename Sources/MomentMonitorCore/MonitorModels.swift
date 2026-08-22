@@ -134,17 +134,20 @@ public struct MomentMonitorSnapshot: Codable, Equatable, Sendable {
   public let generatedAt: Date
   public let items: [MonitorItem]
   public let projectProgress: ProjectProgress
+  public let runtimeObservation: AutomationRuntimeObservation
 
   public init(
     repository: RepositoryCoordinate,
     generatedAt: Date,
     items: [MonitorItem],
-    projectProgress: ProjectProgress = .empty
+    projectProgress: ProjectProgress = .empty,
+    runtimeObservation: AutomationRuntimeObservation = .absent
   ) {
     self.repository = repository
     self.generatedAt = generatedAt
     self.items = items
     self.projectProgress = projectProgress
+    self.runtimeObservation = runtimeObservation
   }
 
   public static func empty(repository: RepositoryCoordinate, at date: Date = Date()) -> Self {
@@ -155,13 +158,28 @@ public struct MomentMonitorSnapshot: Codable, Equatable, Sendable {
     self.items.filter { $0.lane == lane }
   }
 
+  public func replacingRuntimeObservation(
+    _ observation: AutomationRuntimeObservation
+  ) -> Self {
+    Self(
+      repository: self.repository,
+      generatedAt: self.generatedAt,
+      items: self.items,
+      projectProgress: self.projectProgress,
+      runtimeObservation: observation
+    )
+  }
+
   public var health: MonitorHealth {
+    if [.invalid, .stale].contains(self.runtimeObservation.availability) {
+      return .attention
+    }
     if self.items.contains(where: { $0.lane == .blocked || $0.severity == .warning }) {
       return .attention
     }
     if self.items.contains(where: {
       $0.lane == .running || $0.lane == .queued || $0.lane == .prChecks
-    }) {
+    }) || self.runtimeObservation.availability == .live {
       return .busy
     }
     return .idle

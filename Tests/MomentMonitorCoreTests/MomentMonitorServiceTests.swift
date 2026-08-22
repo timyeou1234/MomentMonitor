@@ -22,6 +22,36 @@ final class MomentMonitorServiceTests: XCTestCase {
     XCTAssertEqual(requestedJobRunIDs, [900])
     XCTAssertTrue(snapshot.items(in: .running).first?.detail.contains("Run Luna") == true)
   }
+
+  func testRefreshCombinesOptionalLocalRuntimeStatusWithGitHubTruth() async throws {
+    let trackedIssue = issue(903, title: "Runtime status", labels: ["dev-running"])
+    let status = runtimeStatus(
+      issueNumber: 903,
+      phase: .solReview,
+      model: .sol,
+      role: .reviewer,
+      roundNumber: 1,
+      totalRounds: 4
+    )
+    let service = MomentMonitorService(
+      reader: GitHubReaderStub(issues: [trackedIssue], workflowRuns: []),
+      runtimeReader: RuntimeReaderStub(observation: .live(status))
+    )
+
+    let snapshot = try await service.refresh(configuration: MonitorConfiguration())
+
+    XCTAssertEqual(snapshot.runtimeObservation.availability, .live)
+    XCTAssertEqual(snapshot.items(in: .running).first?.statusText, "Sol")
+    XCTAssertTrue(snapshot.items(in: .running).first?.detail.contains("Sol review") == true)
+  }
+}
+
+private struct RuntimeReaderStub: AutomationRuntimeStatusReading {
+  let observation: AutomationRuntimeObservation
+
+  func read(repository: RepositoryCoordinate) async -> AutomationRuntimeObservation {
+    self.observation
+  }
 }
 
 private actor GitHubReaderStub: GitHubReading {

@@ -27,6 +27,10 @@
           isRefreshing: self.store.isRefreshing
         )
         Divider()
+        if self.store.snapshot.runtimeObservation.availability != .absent {
+          AutomationRuntimeView(observation: self.store.snapshot.runtimeObservation)
+          Divider()
+        }
 
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 14) {
@@ -55,7 +59,10 @@
           }
           .padding(14)
         }
-        .frame(width: 440, height: 520)
+        .frame(
+          width: 440,
+          height: self.store.snapshot.runtimeObservation.availability == .absent ? 520 : 390
+        )
 
         Divider()
         self.footer

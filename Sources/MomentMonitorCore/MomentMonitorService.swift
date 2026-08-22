@@ -2,28 +2,44 @@ import Foundation
 
 public struct MomentMonitorService: Sendable {
   private let reader: any GitHubReading
+  private let runtimeReader: any AutomationRuntimeStatusReading
 
-  public init(reader: any GitHubReading) {
+  public init(
+    reader: any GitHubReading,
+    runtimeReader: any AutomationRuntimeStatusReading = NoAutomationRuntimeStatusReader()
+  ) {
     self.reader = reader
+    self.runtimeReader = runtimeReader
   }
 
   public static func live() throws -> Self {
-    Self(reader: try GitHubCLIClient.live())
+    Self(
+      reader: try GitHubCLIClient.live(),
+      runtimeReader: AutomationRuntimeStatusReader.live()
+    )
   }
 
   public func verifyPrerequisites() async throws {
     try await self.reader.verifyAuthentication()
   }
 
+  public func readRuntimeStatus(
+    configuration: MonitorConfiguration
+  ) async -> AutomationRuntimeObservation {
+    await self.runtimeReader.read(repository: configuration.repository)
+  }
+
   public func refresh(configuration: MonitorConfiguration) async throws -> MomentMonitorSnapshot {
     async let issuesTask = self.reader.fetchIssues(repository: configuration.repository)
     async let pullRequestsTask = self.reader.fetchPullRequests(repository: configuration.repository)
     async let workflowRunsTask = self.reader.fetchWorkflowRuns(repository: configuration.repository)
+    async let runtimeTask = self.runtimeReader.read(repository: configuration.repository)
 
-    let (issues, pullRequests, workflowRuns) = try await (
+    let (issues, pullRequests, workflowRuns, runtimeObservation) = try await (
       issuesTask,
       pullRequestsTask,
-      workflowRunsTask
+      workflowRunsTask,
+      runtimeTask
     )
 
     let activeRuns = workflowRuns.filter { run in
@@ -66,7 +82,8 @@ public struct MomentMonitorService: Sendable {
       issues: issues,
       pullRequests: pullRequests,
       workflowRuns: workflowRuns,
-      jobsByRunID: jobsByRunID
+      jobsByRunID: jobsByRunID,
+      runtimeObservation: runtimeObservation
     )
   }
 }

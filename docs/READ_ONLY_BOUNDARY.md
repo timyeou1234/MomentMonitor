@@ -31,6 +31,22 @@ GET /repos/{owner}/{repo}/actions/runs
 GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs
 ```
 
+## Optional local phase input
+
+App 可以唯讀開啟 controller-owned：
+
+```text
+~/Library/Application Support/MomentAutomation/runtime/current.json
+```
+
+Reader 使用 `O_NOFOLLOW`、regular-file、current-user owner、group/other mode
+bits 為零、16 KiB size bound、exact field allow-list、known schema/enum、
+timestamp/counter/SHA consistency 與 live PID 檢查。任何不符合都 fail closed；
+repository 不相符則視為與目前 viewer 無關。
+
+這份資料只證明本機 controller 回報的執行 phase，不證明 PR、check、merge 或
+Issue completion。Viewer 不寫入此檔、不讀 checkout，也不把 telemetry 上傳。
+
 ## Forbidden behavior
 
 - 非 GET HTTP method；
@@ -42,6 +58,8 @@ GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs
 - shelling out to `git`；
 - writing files into a Moment checkout；
 - uploading observer state back to GitHub。
+- writing、renaming、deleting或修復 local controller status；
+- reading prompt、response、finding、JSONL、credential或 private reasoning。
 
 ## Enforcement
 

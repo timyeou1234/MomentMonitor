@@ -12,12 +12,18 @@ public struct MomentStateBuilder: Sendable {
     issues: [GitHubIssue],
     pullRequests: [GitHubPullRequest],
     workflowRuns: [GitHubWorkflowRun],
-    jobsByRunID: [Int64: [GitHubWorkflowJob]] = [:]
+    jobsByRunID: [Int64: [GitHubWorkflowJob]] = [:],
+    runtimeObservation: AutomationRuntimeObservation = .absent
   ) -> MomentMonitorSnapshot {
     let issueItems = issues.filter { !$0.isPullRequest }
     let issueByNumber = Dictionary(uniqueKeysWithValues: issueItems.map { ($0.number, $0) })
     let openIssueNumbers = Set(issueItems.filter(\.isOpen).map(\.number))
     let pullRequestByNumber = Dictionary(uniqueKeysWithValues: pullRequests.map { ($0.number, $0) })
+    let reconciledRuntimeObservation = Self.reconcileRuntimeObservation(
+      runtimeObservation,
+      issueByNumber: issueByNumber,
+      pullRequestByNumber: pullRequestByNumber
+    )
     let issueNumberByPullRequest = Dictionary(
       uniqueKeysWithValues: pullRequests.compactMap { pullRequest in
         RunCorrelation.issueNumber(from: pullRequest).map { (pullRequest.number, $0) }
@@ -44,6 +50,18 @@ public struct MomentStateBuilder: Sendable {
       })
     let activeIssueNumbersFromPullRequestRuns = Set(
       activePullRequestNumbers.compactMap { issueNumberByPullRequest[$0] })
+    let runtimeIssueNumber = reconciledRuntimeObservation.status.flatMap { status in
+      [.live, .stale].contains(reconciledRuntimeObservation.availability)
+        ? status.issueNumber : nil
+    }
+    let activeRunsForDisplay = activeRuns.filter { run in
+      guard let runtimeIssueNumber else { return true }
+      let directIssue = RunCorrelation.issueNumber(from: run)
+      let pullRequestIssue = RunCorrelation.pullRequestNumber(from: run).flatMap {
+        issueNumberByPullRequest[$0]
+      }
+      return (directIssue ?? pullRequestIssue) != runtimeIssueNumber
+    }
     let latestRunByIssue = Self.latestRunByIssue(from: relevantRuns)
     let prFastRunsByPullRequest = Self.prFastRunsByPullRequest(from: relevantRuns)
     let automationPullRequests = pullRequests.filter(Self.isAutomationPullRequest)
@@ -57,6 +75,13 @@ public struct MomentStateBuilder: Sendable {
     }
 
     var items: [MonitorItem] = []
+    if let runtimeItem = self.runtimeItem(
+      observation: reconciledRuntimeObservation,
+      issueByNumber: issueByNumber,
+      pullRequestByNumber: pullRequestByNumber
+    ) {
+      items.append(runtimeItem)
+    }
     items.append(
       contentsOf: self.workQueueItems(
         issues: issueItems,
@@ -65,7 +90,7 @@ public struct MomentStateBuilder: Sendable {
       ))
     items.append(
       contentsOf: self.activeRunItems(
-        runs: activeRuns,
+        runs: activeRunsForDisplay,
         issueByNumber: issueByNumber,
         pullRequestByNumber: pullRequestByNumber,
         issueNumberByPullRequest: issueNumberByPullRequest,
@@ -75,7 +100,8 @@ public struct MomentStateBuilder: Sendable {
     items.append(
       contentsOf: self.inferredRunningItems(
         issues: issueItems,
-        activeIssueNumbers: activeLocalIssueNumbers.union(activeIssueNumbersFromPullRequestRuns)
+        activeIssueNumbers: activeLocalIssueNumbers.union(activeIssueNumbersFromPullRequestRuns),
+        runtimeObservation: reconciledRuntimeObservation
       ))
     items.append(
       contentsOf: self.pullRequestItems(
@@ -116,7 +142,45 @@ public struct MomentStateBuilder: Sendable {
       projectProgress: ProjectProgress(
         completedCount: completedIssueNumbers.count,
         totalCount: trackedIssueNumbers.count
+      ),
+      runtimeObservation: reconciledRuntimeObservation
+    )
+  }
+
+  private func runtimeItem(
+    observation: AutomationRuntimeObservation,
+    issueByNumber: [Int: GitHubIssue],
+    pullRequestByNumber: [Int: GitHubPullRequest]
+  ) -> MonitorItem? {
+    guard [.live, .stale].contains(observation.availability),
+      let status = observation.status,
+      let issue = issueByNumber[status.issueNumber]
+    else { return nil }
+
+    let pullRequest = status.pullRequestNumber.flatMap { pullRequestByNumber[$0] }
+    var detailParts = [status.phase.title]
+    if let phaseDetail = status.phaseDetail { detailParts.append(phaseDetail) }
+    if observation.availability == .live {
+      detailParts.append(
+        "phase running for \(RelativeTimeFormatter.compactDuration(from: status.phaseStartedAt, to: self.now))"
       )
+    } else if let message = observation.message {
+      detailParts.append(message)
+    }
+
+    return MonitorItem(
+      id: "running:runtime:\(status.runID)",
+      lane: .running,
+      source: .inferredState,
+      title: "#\(status.issueNumber) \(issue.title)",
+      detail: detailParts.joined(separator: " · "),
+      statusText: Self.runtimeBadge(status),
+      issueNumber: status.issueNumber,
+      pullRequestNumber: status.pullRequestNumber,
+      url: pullRequest?.htmlUrl ?? issue.htmlUrl,
+      updatedAt: status.phaseStartedAt,
+      severity: observation.availability == .live ? .active : .warning,
+      sequenceNumber: status.issueNumber
     )
   }
 
@@ -125,7 +189,7 @@ public struct MomentStateBuilder: Sendable {
     openIssueNumbers: Set<Int>,
     repositoryOwner: String
   ) -> [MonitorItem] {
-    issues.compactMap { issue in
+    return issues.compactMap { issue -> MonitorItem? in
       let labels = issue.labelNames
       let hasReadyMarker = (issue.body ?? "").contains("<!-- moment:dev-ready -->")
       let isOwnerAuthored =
@@ -253,13 +317,18 @@ public struct MomentStateBuilder: Sendable {
 
   private func inferredRunningItems(
     issues: [GitHubIssue],
-    activeIssueNumbers: Set<Int>
+    activeIssueNumbers: Set<Int>,
+    runtimeObservation: AutomationRuntimeObservation
   ) -> [MonitorItem] {
-    issues.compactMap { issue in
+    let runtimeIssueNumber = runtimeObservation.status.flatMap { status in
+      [.live, .stale].contains(runtimeObservation.availability) ? status.issueNumber : nil
+    }
+    return issues.compactMap { issue -> MonitorItem? in
       guard issue.isOpen,
         issue.labelNames.contains("dev-running"),
         !issue.labelNames.contains("dev-blocked"),
-        !activeIssueNumbers.contains(issue.number)
+        !activeIssueNumbers.contains(issue.number),
+        issue.number != runtimeIssueNumber
       else { return nil }
 
       return MonitorItem(
@@ -275,6 +344,41 @@ public struct MomentStateBuilder: Sendable {
         severity: .active,
         sequenceNumber: issue.number
       )
+    }
+  }
+
+  private static func reconcileRuntimeObservation(
+    _ observation: AutomationRuntimeObservation,
+    issueByNumber: [Int: GitHubIssue],
+    pullRequestByNumber: [Int: GitHubPullRequest]
+  ) -> AutomationRuntimeObservation {
+    guard let status = observation.status else { return observation }
+    guard let issue = issueByNumber[status.issueNumber] else {
+      return .stale(status, message: "The originating Issue is not visible on GitHub.")
+    }
+
+    if observation.availability == .terminal, status.outcome == .completed {
+      let pullRequest = status.pullRequestNumber.flatMap { pullRequestByNumber[$0] }
+      let confirmed = !issue.isOpen && pullRequest?.isMerged == true
+      return .terminal(
+        status,
+        message: confirmed
+          ? "GitHub confirms the merged PR and closed Issue."
+          : "Awaiting GitHub merged-PR and closed-Issue confirmation."
+      )
+    }
+    return observation
+  }
+
+  private static func runtimeBadge(_ status: AutomationRuntimeStatus) -> String {
+    if let model = status.model { return model.displayName }
+    return switch status.phase {
+    case .prFast: "PR Fast"
+    case .creatingPR: "PR"
+    case .verifyingExactHead: "Verify"
+    case .mergingPR: "Merge"
+    case .closingIssue: "Close"
+    default: status.phase.stage.title
     }
   }
 

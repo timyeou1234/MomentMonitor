@@ -1,0 +1,212 @@
+import Darwin
+import Foundation
+import XCTest
+
+@testable import MomentMonitorCore
+
+final class AutomationRuntimeStatusReaderTests: XCTestCase {
+  func testReadsStrictLiveControllerStatus() async throws {
+    try await self.withStatusFile { fileURL in
+      try self.writeStatus(to: fileURL)
+      let reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { $0 == 65_100 }
+      )
+
+      let observation = await reader.read(repository: .moment)
+
+      XCTAssertEqual(observation.availability, .live)
+      XCTAssertEqual(observation.status?.phase, .lunaVerification)
+      XCTAssertEqual(observation.status?.model, .luna)
+      XCTAssertEqual(observation.status?.roundNumber, 2)
+      XCTAssertEqual(observation.status?.totalRounds, 4)
+    }
+  }
+
+  func testDeadRunnerMakesAnActiveRecordStale() async throws {
+    try await self.withStatusFile { fileURL in
+      try self.writeStatus(to: fileURL)
+      let reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in false }
+      )
+
+      let observation = await reader.read(repository: .moment)
+
+      XCTAssertEqual(observation.availability, .stale)
+      XCTAssertTrue(observation.message?.contains("no longer running") == true)
+    }
+  }
+
+  func testTerminalRecordDoesNotDependOnProcessLiveness() async throws {
+    try await self.withStatusFile { fileURL in
+      try self.writeStatus(
+        to: fileURL,
+        overrides: [
+          "phase": "completed",
+          "last_active_phase": "closing_issue",
+          "outcome": "completed",
+          "model": NSNull(),
+          "role": "controller",
+          "round_number": NSNull(),
+          "total_rounds": NSNull(),
+          "repair_attempt": NSNull(),
+          "pull_request_number": 400,
+        ]
+      )
+      let reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in false }
+      )
+
+      let observation = await reader.read(repository: .moment)
+
+      XCTAssertEqual(observation.availability, .terminal)
+      XCTAssertEqual(observation.status?.pullRequestNumber, 400)
+    }
+  }
+
+  func testRepositoryMismatchIsNotPresentedAsMomentActivity() async throws {
+    try await self.withStatusFile { fileURL in
+      try self.writeStatus(to: fileURL, overrides: ["repository": "owner/Other"])
+      let reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in true }
+      )
+
+      let observation = await reader.read(repository: .moment)
+
+      XCTAssertEqual(observation, .absent)
+    }
+  }
+
+  func testUnknownFieldsAndPhaseDisagreementFailClosed() async throws {
+    try await self.withStatusFile { fileURL in
+      try self.writeStatus(to: fileURL, overrides: ["prompt": "must never be published"])
+      var reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in true }
+      )
+      var observation = await reader.read(repository: .moment)
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("outside the public contract") == true)
+
+      try self.writeStatus(
+        to: fileURL,
+        overrides: ["phase": "sol_review", "model": "gpt-5.6-luna"]
+      )
+      reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in true }
+      )
+      observation = await reader.read(repository: .moment)
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("disagree") == true)
+    }
+  }
+
+  func testUnsafePermissionsAndSymbolicLinksFailClosed() async throws {
+    try await self.withStatusFile { fileURL in
+      try self.writeStatus(to: fileURL)
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o644],
+        ofItemAtPath: fileURL.path
+      )
+      var reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in true }
+      )
+      var observation = await reader.read(repository: .moment)
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("permissions") == true)
+
+      let target = fileURL.deletingLastPathComponent().appendingPathComponent("target.json")
+      try self.writeStatus(to: target)
+      try FileManager.default.removeItem(at: fileURL)
+      try FileManager.default.createSymbolicLink(at: fileURL, withDestinationURL: target)
+      reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in true }
+      )
+      observation = await reader.read(repository: .moment)
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("symbolic link") == true)
+    }
+  }
+
+  func testOversizedStatusFailsBeforeDecode() async throws {
+    try await self.withStatusFile { fileURL in
+      try Data(repeating: 0x20, count: AutomationRuntimeStatusReader.maximumBytes + 1)
+        .write(to: fileURL)
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o600],
+        ofItemAtPath: fileURL.path
+      )
+      let reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in true }
+      )
+
+      let observation = await reader.read(repository: .moment)
+
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("size boundary") == true)
+    }
+  }
+
+  private func withStatusFile(
+    _ operation: (URL) async throws -> Void
+  ) async throws {
+    let directory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("moment-runtime-reader-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    try await operation(directory.appendingPathComponent("current.json"))
+  }
+
+  private func writeStatus(
+    to fileURL: URL,
+    overrides: [String: Any] = [:]
+  ) throws {
+    var value: [String: Any] = [
+      "schema_version": 1,
+      "format_version": "moment.automation-runtime.v1",
+      "repository": "timyeou1234/Moment",
+      "run_id": "1787376894237",
+      "issue_number": 237,
+      "pull_request_number": NSNull(),
+      "mode": "implement",
+      "phase": "luna_verification",
+      "last_active_phase": NSNull(),
+      "outcome": "active",
+      "model": "gpt-5.6-luna",
+      "role": "reviewer",
+      "round_number": 2,
+      "total_rounds": 4,
+      "repair_attempt": 1,
+      "runner_pid": 65_100,
+      "sequence": 8,
+      "started_at": "2026-08-22T05:34:00.000Z",
+      "phase_started_at": "2026-08-22T06:43:00.000Z",
+      "updated_at": "2026-08-22T06:43:01.000Z",
+      "base_sha": String(repeating: "a", count: 40),
+      "head_sha": String(repeating: "b", count: 40),
+    ]
+    value.merge(overrides) { _, replacement in replacement }
+    let data = try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys])
+    try data.write(to: fileURL)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600],
+      ofItemAtPath: fileURL.path
+    )
+  }
+}
