@@ -22,7 +22,7 @@ cd tools/MomentMonitor
 swift build -Xswiftc -warnings-as-errors
 swift test -Xswiftc -warnings-as-errors
 ./Scripts/check_read_only.sh
-bash -n Scripts/check_read_only.sh Scripts/package_app.sh
+bash -n Scripts/check_read_only.sh Scripts/package_app.sh Scripts/install_app.sh
 ```
 
 On macOS also run:

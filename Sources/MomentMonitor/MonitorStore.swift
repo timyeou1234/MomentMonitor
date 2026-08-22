@@ -9,6 +9,9 @@
     @Published private(set) var snapshot: MomentMonitorSnapshot
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastError: String?
+    @Published private(set) var hasSuccessfulRefresh = false
+    @Published private(set) var settingsFeedback: String?
+    @Published private(set) var settingsFeedbackIsError = false
     @Published var repositoryText: String
     @Published var refreshIntervalSeconds: Int
     @Published var completedItemLimit: Int
@@ -33,6 +36,9 @@
       if self.lastError != nil || self.snapshot.health == .attention {
         return "exclamationmark.triangle.fill"
       }
+      if !self.hasSuccessfulRefresh {
+        return self.isRefreshing ? "arrow.triangle.2.circlepath" : "ellipsis.circle"
+      }
       switch self.snapshot.health {
       case .busy:
         return "arrow.triangle.2.circlepath"
@@ -43,8 +49,35 @@
       }
     }
 
-    var lastUpdatedText: String {
-      RelativeTimeFormatter.relativeDescription(from: self.snapshot.generatedAt)
+    var statusAccessibilityValue: String {
+      if self.lastError != nil {
+        return "Refresh failed"
+      }
+      if !self.hasSuccessfulRefresh {
+        return self.isRefreshing ? "Refreshing" : "Not updated yet"
+      }
+      switch self.snapshot.health {
+      case .attention:
+        return "Attention required"
+      case .busy:
+        return "\(self.snapshot.activeCount) active items"
+      case .idle:
+        return "Idle"
+      }
+    }
+
+    var updateStatusText: String {
+      guard self.hasSuccessfulRefresh else { return "Not updated yet" }
+      return "Updated \(RelativeTimeFormatter.relativeDescription(from: self.snapshot.generatedAt))"
+    }
+
+    var repositoryValidationMessage: String? {
+      do {
+        _ = try RepositoryCoordinate(parsing: self.repositoryText)
+        return nil
+      } catch {
+        return error.localizedDescription
+      }
     }
 
     func refresh() async {
@@ -66,20 +99,43 @@
 
         let refreshed = try await service.refresh(configuration: configuration)
         self.snapshot = refreshed
+        self.hasSuccessfulRefresh = true
         self.lastError = nil
       } catch {
         self.lastError = error.localizedDescription
       }
     }
 
-    func applyPreferences() {
+    func applyPreferences() async {
+      let configuration: MonitorConfiguration
+      do {
+        configuration = try self.configuration()
+      } catch {
+        self.settingsFeedback = error.localizedDescription
+        self.settingsFeedbackIsError = true
+        return
+      }
+
+      self.repositoryText = configuration.repository.fullName
       self.refreshIntervalSeconds = min(max(15, self.refreshIntervalSeconds), 300)
       self.completedItemLimit = min(max(1, self.completedItemLimit), 30)
       self.defaults.set(self.repositoryText, forKey: "repository")
       self.defaults.set(self.refreshIntervalSeconds, forKey: "refreshIntervalSeconds")
       self.defaults.set(self.completedItemLimit, forKey: "completedItemLimit")
       self.restartPolling()
-      Task { await self.refresh() }
+      await self.refresh()
+      if let lastError = self.lastError {
+        self.settingsFeedback = "Saved, but refresh failed: \(lastError)"
+        self.settingsFeedbackIsError = true
+      } else {
+        self.settingsFeedback = "Saved and refreshed."
+        self.settingsFeedbackIsError = false
+      }
+    }
+
+    func clearSettingsFeedback() {
+      self.settingsFeedback = nil
+      self.settingsFeedbackIsError = false
     }
 
     func openRepository() {

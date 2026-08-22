@@ -12,7 +12,7 @@
           .environmentObject(self.store)
       } label: {
         Image(systemName: self.store.statusSymbol)
-          .accessibilityLabel("Moment Monitor")
+          .accessibilityLabel("Moment Monitor, \(self.store.statusAccessibilityValue)")
       }
       .menuBarExtraStyle(.window)
 

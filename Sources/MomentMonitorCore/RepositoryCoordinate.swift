@@ -30,7 +30,7 @@ public struct RepositoryCoordinate: Codable, Hashable, Sendable {
   }
 
   private static func isValidSegment(_ value: String) -> Bool {
-    guard !value.isEmpty, value.count <= 100 else { return false }
+    guard !value.isEmpty, value != ".", value != "..", value.count <= 100 else { return false }
     return value.unicodeScalars.allSatisfy { scalar in
       CharacterSet.alphanumerics.contains(scalar) || scalar == "-" || scalar == "_" || scalar == "."
     }

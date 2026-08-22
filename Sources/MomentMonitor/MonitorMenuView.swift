@@ -94,6 +94,8 @@
         .buttonStyle(.borderless)
         .help("Refresh")
         .disabled(self.store.isRefreshing)
+        .accessibilityLabel("Refresh now")
+        .accessibilityValue(self.store.isRefreshing ? "Refreshing" : "Ready")
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 12)
@@ -101,7 +103,7 @@
 
     private var footer: some View {
       HStack {
-        Text("Updated \(self.store.lastUpdatedText)")
+        Text(self.store.updateStatusText)
           .font(.caption2)
           .foregroundStyle(.secondary)
 

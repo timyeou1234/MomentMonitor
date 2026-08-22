@@ -1,4 +1,4 @@
-.PHONY: build test check package clean
+.PHONY: build test check package install clean
 
 build:
 	swift build --target MomentMonitorCore
@@ -11,6 +11,9 @@ check:
 
 package:
 	./Scripts/package_app.sh
+
+install:
+	./Scripts/install_app.sh
 
 clean:
 	rm -rf .build dist

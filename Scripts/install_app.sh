@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "install_app.sh must run on macOS." >&2
+  exit 1
+fi
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+install_root="${MOMENT_MONITOR_INSTALL_DIR:-${HOME}/Applications}"
+
+if [[ "$install_root" != /* || "$install_root" == "/" ]]; then
+  echo "MOMENT_MONITOR_INSTALL_DIR must be an absolute directory other than /." >&2
+  exit 1
+fi
+
+"$root/Scripts/package_app.sh"
+
+source_app="$root/dist/Moment Monitor.app"
+destination="$install_root/Moment Monitor.app"
+mkdir -p "$install_root"
+staging="$(mktemp -d "$install_root/.moment-monitor-install.XXXXXX")"
+staged_app="$staging/Moment Monitor.app"
+previous_app="$staging/Previous Moment Monitor.app"
+backup_moved=false
+
+cleanup() {
+  set +e
+  if $backup_moved && [[ ! -d "$destination" && -d "$previous_app" ]]; then
+    mv "$previous_app" "$destination"
+  fi
+  case "$staging" in
+    "$install_root"/.moment-monitor-install.*) rm -rf -- "$staging" ;;
+  esac
+}
+trap cleanup EXIT INT TERM
+
+ditto "$source_app" "$staged_app"
+test -x "$staged_app/Contents/MacOS/MomentMonitor"
+plutil -lint "$staged_app/Contents/Info.plist" >/dev/null
+codesign --verify --deep --strict "$staged_app"
+
+osascript -e 'tell application id "com.timyeou.momentmonitor" to quit' >/dev/null 2>&1 || true
+for unused in 1 2 3 4 5 6 7 8 9 10; do
+  pgrep -x MomentMonitor >/dev/null 2>&1 || break
+  sleep 0.25
+done
+if pgrep -x MomentMonitor >/dev/null 2>&1; then
+  echo "Moment Monitor is still running. Quit it, then rerun the installer." >&2
+  exit 1
+fi
+
+if [[ -e "$destination" && ! -d "$destination" ]]; then
+  echo "Install destination exists but is not an app directory: $destination" >&2
+  exit 1
+fi
+if [[ -d "$destination" ]]; then
+  mv "$destination" "$previous_app"
+  backup_moved=true
+fi
+
+mv "$staged_app" "$destination"
+backup_moved=false
+codesign --verify --deep --strict "$destination"
+open "$destination"
+
+echo "Installed and launched: $destination"

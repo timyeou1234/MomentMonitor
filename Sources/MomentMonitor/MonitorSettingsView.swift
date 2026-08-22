@@ -9,6 +9,14 @@
         Section("Repository") {
           TextField("owner/name", text: self.$store.repositoryText)
             .textFieldStyle(.roundedBorder)
+            .onChange(of: self.store.repositoryText) {
+              self.store.clearSettingsFeedback()
+            }
+          if let validationMessage = self.store.repositoryValidationMessage {
+            Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
+              .font(.caption)
+              .foregroundStyle(.red)
+          }
           Text("The default is timyeou1234/Moment. The monitor never writes to this repository.")
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -44,12 +52,31 @@
           .foregroundStyle(.secondary)
         }
 
+        if let feedback = self.store.settingsFeedback {
+          Label(
+            feedback,
+            systemImage: self.store.settingsFeedbackIsError
+              ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"
+          )
+          .font(.caption)
+          .foregroundStyle(self.store.settingsFeedbackIsError ? .red : .green)
+        }
+
         HStack {
           Spacer()
-          Button("Apply and Refresh") {
-            self.store.applyPreferences()
+          Button {
+            Task { await self.store.applyPreferences() }
+          } label: {
+            if self.store.isRefreshing {
+              ProgressView()
+                .controlSize(.small)
+            } else {
+              Text("Apply and Refresh")
+            }
           }
           .keyboardShortcut(.defaultAction)
+          .disabled(
+            self.store.repositoryValidationMessage != nil || self.store.isRefreshing)
         }
       }
       .formStyle(.grouped)

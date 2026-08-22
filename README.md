@@ -61,7 +61,25 @@ Issue 與 PR 會完整分頁；workflow history 只讀最新 100 筆，避免已
 
 ## 建置與安裝
 
-在 macOS 執行：
+在 macOS 執行一鍵安裝：
+
+```bash
+./Scripts/install_app.sh
+```
+
+它會先跑測試與 release build，驗證 ad-hoc signature，再安全更新並啟動：
+
+```text
+~/Applications/Moment Monitor.app
+```
+
+若要安裝到其他位置，可指定絕對目錄：
+
+```bash
+MOMENT_MONITOR_INSTALL_DIR=/Applications ./Scripts/install_app.sh
+```
+
+只建置、不安裝：
 
 ```bash
 swift test
