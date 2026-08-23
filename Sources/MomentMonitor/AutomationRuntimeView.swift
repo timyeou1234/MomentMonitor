@@ -34,7 +34,7 @@
                 .foregroundStyle(.tertiary)
             }
 
-            self.stageTrack(status)
+            self.lifecycleTrack(status)
 
             if let strategy = AutomationStrategyProgress(observation: self.observation) {
               self.strategyTrack(strategy)
@@ -59,7 +59,7 @@
               .foregroundStyle(self.observation.availability == .invalid ? .red : .secondary)
               .fixedSize(horizontal: false, vertical: true)
           } else if self.observation.availability == .live {
-            Text("Controller-reported local phase · process identity verified")
+            Text("Read-only observer · GitHub and the local controller remain authoritative")
               .font(.caption2)
               .foregroundStyle(.secondary)
           }
@@ -70,7 +70,7 @@
         .accessibilityLabel(self.sectionTitle)
         .accessibilityValue(self.accessibilityValue(now: context.date))
         .accessibilityHint(
-          "Local controller telemetry reports execution phase only. GitHub remains authoritative for pull request merge and Issue completion."
+          "Moment Monitor summarizes the controller lifecycle only. It cannot dispatch, approve, repair, or merge work."
         )
       }
     }
@@ -135,31 +135,38 @@
     }
 
     @ViewBuilder
-    private func stageTrack(_ status: AutomationRuntimeStatus) -> some View {
+    private func lifecycleTrack(_ status: AutomationRuntimeStatus) -> some View {
       let effectivePhase = status.lastActivePhase ?? status.phase
-      let currentStage = effectivePhase.stage
+      let currentStage = effectivePhase.lifecycleStage
       let completed = status.outcome == .completed
 
-      VStack(spacing: 4) {
-        HStack(spacing: 4) {
-          ForEach(AutomationRuntimeStage.allCases, id: \.self) { stage in
-            Capsule()
-              .fill(
-                completed || stage.rawValue <= currentStage.rawValue
-                  ? self.accentColor : Color.secondary.opacity(0.16)
-              )
-              .frame(height: 4)
-          }
+      VStack(alignment: .leading, spacing: 5) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text("LIFECYCLE")
+            .font(.system(size: 8, weight: .bold, design: .rounded))
+            .tracking(0.7)
+            .foregroundStyle(.secondary)
+          Spacer(minLength: 4)
+          Text(completed ? "Completed" : currentStage.title)
+            .font(.system(size: 8, weight: .semibold, design: .rounded))
+            .foregroundStyle(self.accentColor)
         }
 
-        HStack(spacing: 0) {
-          ForEach(AutomationRuntimeStage.allCases, id: \.self) { stage in
+        HStack(spacing: 4) {
+          ForEach(AutomationLifecycleStage.allCases, id: \.self) { stage in
+            let reached = completed || stage.rawValue <= currentStage.rawValue
+            let isCurrent = !completed && stage == currentStage
             Text(stage.title)
-              .font(.system(size: 8, weight: stage == currentStage ? .semibold : .regular))
-              .foregroundStyle(
-                stage == currentStage ? self.accentColor : Color.secondary.opacity(0.55)
-              )
+              .font(.system(size: 7, weight: .bold, design: .rounded))
+              .foregroundStyle(isCurrent ? Color.white : reached ? self.accentColor : .secondary)
               .frame(maxWidth: .infinity)
+              .padding(.vertical, 3)
+              .background(
+                isCurrent
+                  ? self.accentColor
+                  : reached ? self.accentColor.opacity(0.14) : Color.secondary.opacity(0.08),
+                in: Capsule()
+              )
           }
         }
       }
@@ -234,7 +241,13 @@
       guard let status = self.observation.status else {
         return self.observation.message ?? "No local runtime status"
       }
-      var parts = [self.badgeText, self.phaseTitle(status), "Issue \(status.issueNumber)"]
+      let effectivePhase = status.lastActivePhase ?? status.phase
+      var parts = [
+        self.badgeText,
+        self.phaseTitle(status),
+        "lifecycle \(effectivePhase.lifecycleStage.title)",
+        "Issue \(status.issueNumber)",
+      ]
       if let pullRequestNumber = status.pullRequestNumber {
         parts.append("pull request \(pullRequestNumber)")
       } else if status.outcome == .active {
