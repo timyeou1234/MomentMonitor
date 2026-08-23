@@ -1,6 +1,7 @@
 "use strict";
 
-const stageOrder = ["prepare", "develop", "validate", "review", "publish"];
+// AutomationRuntimeStage is encoded by Swift as its stable integer raw value.
+const stageOrder = [0, 1, 2, 3, 4];
 const stageTitles = ["Prepare", "Develop", "Validate", "Review", "Publish"];
 const state = { snapshot: null, connected: false, lastSuccess: null, timer: null };
 
