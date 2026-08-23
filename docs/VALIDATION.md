@@ -60,6 +60,8 @@ The local phase card polls independently every second. GitHub polling remains bo
 
 The phone page polls the app's in-memory snapshot every second while visible and every 10 seconds while hidden. Browser suspension can delay a background page; returning to the page triggers an immediate retry. Remote HTTPS access is intentionally delegated to Tailscale Serve and its ACL rather than implemented as a public listener in Moment Monitor.
 
+The phone page exposes an explicit Refresh retry and separately renders the latest source-data timestamp from GitHub snapshot generation, runtime telemetry, or Codex usage. The HTTP receipt timestamp remains transport-only and cannot make unchanged data look newly updated.
+
 ## Deliberately not claimed
 
 - Developer ID signing, notarization, external distribution, background auto-update, or App Store readiness;

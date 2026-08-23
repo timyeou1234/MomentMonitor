@@ -43,6 +43,12 @@ Tailscale。頁面在前景每秒更新，切到背景後降為每 10 秒；iOS 
 Safari，所以回到頁面時才會立即重新連線。連線暫時中斷時，頁面只保留目前
 記憶體中的最後畫面並顯示 Mac unavailable，不會把舊 snapshot 當成即時資料。
 
+頁首 **Refresh** 可立即重新向 Mac 讀取 snapshot，適合從背景回來或連線恢復後
+手動重試；它不會啟動 automation，也不會修改 GitHub、controller status 或 Codex。
+`Last update at` 顯示 GitHub snapshot、runtime telemetry 與 Codex usage 中最新的來源
+時間；頁尾 `Received …` 只表示手機最近成功收到 Mac 回應的時間。兩者刻意分開，
+避免把傳輸成功誤認為資料已改變。
+
 ## Stop or reset
 
 暫停 dashboard：在 Moment Monitor Settings 關閉 **Phone dashboard** 並 Apply。

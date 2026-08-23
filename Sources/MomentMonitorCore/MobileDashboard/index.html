@@ -32,6 +32,17 @@
       <div class="readonly-badge"><span aria-hidden="true"></span> READ ONLY</div>
     </header>
 
+    <section class="sync-bar" aria-label="Dashboard freshness">
+      <div class="sync-details">
+        <div><span id="connection-dot-top" class="connection-dot" aria-hidden="true"></span><span id="connection-text-top">Connecting to Mac</span></div>
+        <time id="last-update-time">Last update at —</time>
+      </div>
+      <button id="refresh-button" class="refresh-button" type="button" aria-label="Refresh dashboard now" title="Get the latest snapshot from this Mac">
+        <span class="refresh-icon" aria-hidden="true">↻</span>
+        <span id="refresh-label">Refresh</span>
+      </button>
+    </section>
+
     <main>
       <section class="progress-card glass-card" aria-labelledby="progress-heading">
         <div>
