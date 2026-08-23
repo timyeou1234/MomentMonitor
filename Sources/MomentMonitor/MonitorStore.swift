@@ -17,6 +17,10 @@
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastError: String?
     @Published private(set) var hasSuccessfulRefresh = false
+    @Published private(set) var codexUsage: CodexUsageObservation {
+      didSet { self.mobileDashboardSnapshotStore.updateCodexUsage(self.codexUsage) }
+    }
+    @Published private(set) var isCodexUsageRefreshing = false
     @Published private(set) var settingsFeedback: String?
     @Published private(set) var settingsFeedbackIsError = false
     @Published var repositoryText: String
@@ -29,6 +33,8 @@
     private var service: MomentMonitorService?
     private var pollingTask: Task<Void, Never>?
     private var runtimePollingTask: Task<Void, Never>?
+    private var codexUsagePollingTask: Task<Void, Never>?
+    private var codexUsageClient: CodexUsageClient?
     private let defaults: UserDefaults
     private let mobileDashboardSnapshotStore: MobileDashboardSnapshotStore
     private lazy var mobileDashboardServer: MobileDashboardServer? = {
@@ -57,8 +63,13 @@
         defaults.object(forKey: "mobileDashboardPort") as? Int
         ?? MobileDashboardServer.defaultPort
       let initialSnapshot = MomentMonitorSnapshot.empty(repository: .moment)
+      let initialCodexUsage = CodexUsageObservation.unavailable(message: "Not refreshed yet.")
       self.snapshot = initialSnapshot
-      self.mobileDashboardSnapshotStore = MobileDashboardSnapshotStore(snapshot: initialSnapshot)
+      self.codexUsage = initialCodexUsage
+      self.mobileDashboardSnapshotStore = MobileDashboardSnapshotStore(
+        snapshot: initialSnapshot,
+        codexUsage: initialCodexUsage
+      )
 
       Self.logger.info(
         "Mobile dashboard preference is \(self.mobileDashboardEnabled, privacy: .public) on port \(self.mobileDashboardPort, privacy: .public)"
@@ -66,8 +77,9 @@
 
       self.restartPolling()
       self.startRuntimePolling()
+      self.startCodexUsagePolling()
       self.restartMobileDashboard()
-      Task { await self.refresh() }
+      Task { await self.refreshAll() }
     }
 
     var statusSymbol: String {
@@ -176,6 +188,35 @@
       }
     }
 
+    func refreshAll() async {
+      await self.refresh()
+      await self.refreshCodexUsage()
+    }
+
+    func refreshCodexUsage() async {
+      guard !self.isCodexUsageRefreshing else { return }
+      self.isCodexUsageRefreshing = true
+      defer { self.isCodexUsageRefreshing = false }
+
+      do {
+        let client: CodexUsageClient
+        if let existing = self.codexUsageClient {
+          client = existing
+        } else {
+          let created = try CodexUsageClient.live()
+          self.codexUsageClient = created
+          client = created
+        }
+        self.codexUsage = try await client.fetchUsage()
+      } catch let error as CodexUsageError {
+        self.codexUsage = .unavailable(
+          message: error.errorDescription ?? "Codex usage is unavailable."
+        )
+      } catch {
+        self.codexUsage = .unavailable(message: "Codex usage is unavailable.")
+      }
+    }
+
     func applyPreferences() async {
       let configuration: MonitorConfiguration
       do {
@@ -268,6 +309,17 @@
           if observation != self.snapshot.runtimeObservation {
             self.snapshot = self.snapshot.replacingRuntimeObservation(observation)
           }
+        }
+      }
+    }
+
+    private func startCodexUsagePolling() {
+      self.codexUsagePollingTask?.cancel()
+      self.codexUsagePollingTask = Task { [weak self] in
+        while !Task.isCancelled {
+          try? await Task.sleep(for: .seconds(60))
+          guard let self, !Task.isCancelled else { return }
+          await self.refreshCodexUsage()
         }
       }
     }

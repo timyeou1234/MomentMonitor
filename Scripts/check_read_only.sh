@@ -34,6 +34,13 @@ if grep -RInE 'https?://|innerHTML|localStorage' Sources/MomentMonitorCore/Mobil
   exit 1
 fi
 
+codex_usage_reader="Sources/MomentMonitorCore/CodexUsageClient.swift"
+grep -q 'account/rateLimits/read' "$codex_usage_reader"
+if grep -nE 'account/usage/read|account/rateLimitResetCredit/consume|account/sendAddCreditsNudgeEmail|thread/start|turn/start' "$codex_usage_reader"; then
+  echo "Codex usage integration exceeds the read-only rate-limit boundary." >&2
+  exit 1
+fi
+
 swift test
 
 echo "Read-only contract and tests passed."

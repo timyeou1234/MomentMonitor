@@ -1,7 +1,7 @@
 import Foundation
 
 public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
-  public static let schemaVersion = 2
+  public static let schemaVersion = 3
 
   public let schemaVersion: Int
   public let repository: String
@@ -9,16 +9,22 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
   public let servedAt: Date
   public let health: MonitorHealth
   public let projectProgress: ProjectProgress
+  public let codexUsage: MobileCodexUsageSummary
   public let runtime: MobileRuntimeSummary
   public let lanes: [MobileDashboardLane]
 
-  public init(snapshot: MomentMonitorSnapshot, servedAt: Date = Date()) {
+  public init(
+    snapshot: MomentMonitorSnapshot,
+    codexUsage: CodexUsageObservation,
+    servedAt: Date = Date()
+  ) {
     self.schemaVersion = Self.schemaVersion
     self.repository = snapshot.repository.fullName
     self.generatedAt = snapshot.generatedAt
     self.servedAt = servedAt
     self.health = snapshot.health
     self.projectProgress = snapshot.projectProgress
+    self.codexUsage = MobileCodexUsageSummary(observation: codexUsage)
     self.runtime = MobileRuntimeSummary(observation: snapshot.runtimeObservation)
     self.lanes = MonitorLane.allCases
       .sorted { $0.sortOrder < $1.sortOrder }
@@ -31,6 +37,22 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
           items: items.map(MobileDashboardItem.init)
         )
       }
+  }
+}
+
+public struct MobileCodexUsageSummary: Codable, Equatable, Sendable {
+  public let availability: CodexUsageAvailability
+  public let primary: CodexUsageWindow?
+  public let secondary: CodexUsageWindow?
+  public let fetchedAt: Date?
+  public let message: String?
+
+  public init(observation: CodexUsageObservation) {
+    self.availability = observation.availability
+    self.primary = observation.primary
+    self.secondary = observation.secondary
+    self.fetchedAt = observation.fetchedAt
+    self.message = observation.message
   }
 }
 
@@ -117,9 +139,14 @@ public struct MobileDashboardItem: Codable, Equatable, Sendable {
 public final class MobileDashboardSnapshotStore: @unchecked Sendable {
   private let lock = NSLock()
   private var snapshot: MomentMonitorSnapshot
+  private var codexUsage: CodexUsageObservation
 
-  public init(snapshot: MomentMonitorSnapshot) {
+  public init(
+    snapshot: MomentMonitorSnapshot,
+    codexUsage: CodexUsageObservation = .unavailable(message: "Not refreshed yet.")
+  ) {
     self.snapshot = snapshot
+    self.codexUsage = codexUsage
   }
 
   public func update(_ snapshot: MomentMonitorSnapshot) {
@@ -128,11 +155,22 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
     }
   }
 
+  public func updateCodexUsage(_ codexUsage: CodexUsageObservation) {
+    self.lock.withLock {
+      self.codexUsage = codexUsage
+    }
+  }
+
   public func encodedSnapshot(servedAt: Date = Date()) throws -> Data {
-    let snapshot = self.lock.withLock { self.snapshot }
+    let values = self.lock.withLock { (self.snapshot, self.codexUsage) }
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = [.sortedKeys]
-    return try encoder.encode(MobileDashboardEnvelope(snapshot: snapshot, servedAt: servedAt))
+    return try encoder.encode(
+      MobileDashboardEnvelope(
+        snapshot: values.0,
+        codexUsage: values.1,
+        servedAt: servedAt
+      ))
   }
 }

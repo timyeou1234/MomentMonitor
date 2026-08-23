@@ -32,6 +32,26 @@ function duration(value, now = new Date()) {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
+function usageWindowTitle(minutes) {
+  if (minutes === 300) return "5-hour window";
+  if (minutes === 1440) return "Daily window";
+  if (minutes === 10080) return "Weekly window";
+  if (minutes > 0 && minutes % 1440 === 0) return `${minutes / 1440}-day window`;
+  if (minutes > 0 && minutes % 60 === 0) return `${minutes / 60}-hour window`;
+  return `${minutes}-minute window`;
+}
+
+function resetTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown reset time";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
+}
+
 function renderStages(activeStage, completed) {
   const bars = byID("stage-bars");
   const labels = byID("stage-labels");
@@ -88,6 +108,43 @@ function renderRuntime(runtime, now) {
   message.hidden = !runtime.message;
   message.textContent = runtime.message || "";
   renderStages(runtime.activeStage, runtime.outcome === "completed");
+}
+
+function renderCodexUsage(usage) {
+  const badge = byID("usage-badge");
+  const bar = byID("usage-bar");
+  const fill = byID("usage-bar-fill");
+  const secondary = byID("usage-secondary");
+  const primary = usage && usage.availability === "live" ? usage.primary : null;
+
+  if (!primary) {
+    setText("usage-remaining", "—");
+    setText("usage-detail", usage?.message || "Codex usage is unavailable.");
+    badge.textContent = "UNAVAILABLE";
+    badge.className = "status-badge status-idle";
+    fill.style.width = "0%";
+    bar.removeAttribute("aria-valuenow");
+    bar.setAttribute("aria-label", "Codex usage unavailable");
+    secondary.hidden = true;
+    return;
+  }
+
+  const remaining = Math.max(0, Math.min(100, Math.round(100 - primary.usedPercent)));
+  setText("usage-remaining", remaining);
+  setText("usage-detail", `${usageWindowTitle(primary.windowDurationMinutes)} · resets ${resetTime(primary.resetsAt)}`);
+  badge.textContent = "LIVE";
+  badge.className = "status-badge status-live";
+  fill.style.width = `${remaining}%`;
+  bar.setAttribute("aria-valuenow", String(remaining));
+  bar.setAttribute("aria-label", `${remaining}% Codex capacity remaining`);
+
+  if (usage.secondary) {
+    const secondaryRemaining = Math.max(0, Math.min(100, Math.round(100 - usage.secondary.usedPercent)));
+    secondary.textContent = `${usageWindowTitle(usage.secondary.windowDurationMinutes)}: ${secondaryRemaining}% remaining · resets ${resetTime(usage.secondary.resetsAt)}`;
+    secondary.hidden = false;
+  } else {
+    secondary.hidden = true;
+  }
 }
 
 function createWorkItem(item, now) {
@@ -172,6 +229,7 @@ function render() {
   ring.style.setProperty("--progress", `${percentage * 3.6}deg`);
   ring.setAttribute("aria-label", `${percentage}% closed, ${progress.completedCount} of ${progress.totalCount} M1 Issues`);
 
+  renderCodexUsage(snapshot.codexUsage);
   renderRuntime(snapshot.runtime, now);
   renderLanes(snapshot.lanes, now);
 }
@@ -183,7 +241,7 @@ async function poll() {
     const response = await fetch("/api/v1/snapshot", { cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error(`Snapshot request failed: ${response.status}`);
     const snapshot = await response.json();
-    if (snapshot.schemaVersion !== 2) throw new Error("Unsupported snapshot schema");
+    if (snapshot.schemaVersion !== 3) throw new Error("Unsupported snapshot schema");
     state.snapshot = snapshot;
     state.connected = true;
     state.lastSuccess = new Date(snapshot.servedAt);

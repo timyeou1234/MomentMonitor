@@ -22,6 +22,16 @@ X-GitHub-Api-Version: 2022-11-28
 
 `gh api` 若帶 field 可能自動切換成 POST，因此本專案不使用 `--field`、`--raw-field` 或 request body，並明確指定 `--method GET`。
 
+Codex capacity 只短暫啟動本機官方 `codex app-server`，並依序送出：
+
+```text
+initialize
+initialized
+account/rateLimits/read
+```
+
+不呼叫 `account/usage/read`、thread/turn API、reset-credit consumption 或通知／購買操作。CLI 無法定位、未登入、逾時或 response 不符合 bounded schema 時只回報 Unavailable。
+
 ## Allowed endpoints
 
 ```text
@@ -64,8 +74,8 @@ Host 只允許 loopback 名稱/位址及 Tailscale Serve 的 `.ts.net` 名稱；
 service worker、`localStorage` 或持久化 private snapshot。
 
 Mobile snapshot 是明確 allow-list：repository、時間、health、project progress、
-sanitized runtime phase 與各 lane item。它刻意不輸出 controller run ID、PID、
-base/head SHA、credential、prompt、response、finding 或 token。Issue 標題和工作
+Codex quota remaining percentage/window/reset time、sanitized runtime phase 與各 lane item。它刻意不輸出 controller run ID、PID、
+base/head SHA、account identity、credential、prompt、response、finding 或 raw token activity。Issue 標題和工作
 狀態本身仍是私人資料；遠端存取只能使用 Tailscale Serve 和適當 ACL，不得使用
 Tailscale Funnel、public tunnel 或公開 hosting。
 
@@ -81,7 +91,8 @@ Tailscale Funnel、public tunnel 或公開 hosting。
 - writing files into a Moment checkout；
 - uploading observer state back to GitHub。
 - writing、renaming、deleting或修復 local controller status；
-- reading prompt、response、finding、JSONL、credential或 private reasoning。
+- reading prompt、response、finding、JSONL、credential、raw token activity或 private reasoning。
+- starting a Codex thread/turn、reading account usage history、consuming a reset credit或發送 account notification；
 - binding the mobile dashboard to `0.0.0.0`、LAN interfaces or a public tunnel；
 - exposing raw controller identity、process identity or Git SHA through the mobile API。
 
@@ -92,4 +103,5 @@ Tailscale Funnel、public tunnel 或公開 hosting。
 - `Scripts/check_read_only.sh` scans production sources for forbidden command construction and then runs tests。
 - UI exposes only refresh, open URL, copy a Tailscale Serve command, settings and quit。
 - Temporary GitHub response files use a random `0700` directory and `0600` files, then are removed immediately after each command。
+- Codex App Server request construction is tested as an exact three-message allow-list；temporary stdio files use the same `0700`/`0600` pattern and are removed immediately。
 - `MobileDashboardTests` exercise the real loopback listener, security headers, method allow-list, untrusted Host rejection and sanitized schema；source scans reject public binding, CORS and browser persistence。

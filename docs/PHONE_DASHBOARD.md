@@ -24,6 +24,7 @@ Moment Monitor 可以把 Mac 上已經判定完成的唯讀 snapshot 顯示在 i
 ## What the phone can see
 
 - M1 closed/total progress；
+- Codex quota remaining percentage、window 與 reset time；
 - Luna、Sol Fast、Sol High 的目前 phase、role、round 和 repair attempt；
 - Issue / PR identity、phase elapsed time與五段 lifecycle；
 - Ready、Waiting、Running、PR / Checks、Blocked、Completed 等工作清單；
