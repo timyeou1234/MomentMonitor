@@ -3,7 +3,14 @@
 // AutomationRuntimeStage is encoded by Swift as its stable integer raw value.
 const stageOrder = [0, 1, 2, 3, 4];
 const stageTitles = ["Prepare", "Develop", "Validate", "Review", "Publish"];
-const state = { snapshot: null, connected: false, lastSuccess: null, timer: null };
+const state = {
+  snapshot: null,
+  connected: false,
+  lastSuccess: null,
+  timer: null,
+  polling: false,
+  manualRefresh: false
+};
 
 const byID = (id) => document.getElementById(id);
 const setText = (id, value) => { byID(id).textContent = value; };
@@ -46,6 +53,39 @@ function resetTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "unknown reset time";
   return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function latestDataUpdate(snapshot) {
+  if (!snapshot) return null;
+  const candidates = [
+    snapshot.generatedAt,
+    snapshot.runtime?.updatedAt,
+    snapshot.codexUsage?.fetchedAt
+  ]
+    .filter(Boolean)
+    .map((value) => new Date(value))
+    .filter((date) => !Number.isNaN(date.getTime()));
+  if (!candidates.length) return null;
+  return new Date(Math.max(...candidates.map((date) => date.getTime())));
+}
+
+function updateTime(value, now = new Date()) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  const sameDay = date.getFullYear() === now.getFullYear()
+    && date.getMonth() === now.getMonth()
+    && date.getDate() === now.getDate();
+  return new Intl.DateTimeFormat(undefined, sameDay ? {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit"
+  } : {
     month: "short",
     day: "numeric",
     hour: "numeric",
@@ -241,8 +281,27 @@ function render() {
   const now = new Date();
   byID("connection-banner").hidden = state.connected;
   byID("connection-dot").classList.toggle("connected", state.connected);
+  byID("connection-dot-top").classList.toggle("connected", state.connected);
   setText("connection-text", state.connected ? "Mac connected" : "Mac unavailable");
+  setText("connection-text-top", state.connected ? "Mac connected" : "Mac unavailable");
   setText("updated-time", state.lastSuccess ? `Received ${relativeTime(state.lastSuccess, now)}` : "Not updated yet");
+
+  const refreshButton = byID("refresh-button");
+  refreshButton.disabled = state.polling;
+  refreshButton.classList.toggle("refreshing", state.manualRefresh);
+  refreshButton.setAttribute("aria-busy", String(state.manualRefresh));
+  setText("refresh-label", state.manualRefresh ? "Refreshing" : "Refresh");
+
+  const dataUpdatedAt = latestDataUpdate(snapshot);
+  const lastUpdate = byID("last-update-time");
+  if (dataUpdatedAt) {
+    lastUpdate.dateTime = dataUpdatedAt.toISOString();
+  } else {
+    lastUpdate.removeAttribute("datetime");
+  }
+  lastUpdate.textContent = dataUpdatedAt
+    ? `Last update at ${updateTime(dataUpdatedAt, now)}`
+    : "Last update at —";
   if (!snapshot) return;
 
   setText("repository-name", snapshot.repository);
@@ -261,7 +320,11 @@ function render() {
   renderLanes(snapshot.lanes, now);
 }
 
-async function poll() {
+async function poll({ manual = false } = {}) {
+  if (state.polling) return;
+  state.polling = true;
+  state.manualRefresh = manual;
+  render();
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 4000);
   try {
@@ -276,11 +339,19 @@ async function poll() {
     state.connected = false;
   } finally {
     window.clearTimeout(timeout);
+    state.polling = false;
+    state.manualRefresh = false;
     render();
     window.clearTimeout(state.timer);
     state.timer = window.setTimeout(poll, document.hidden ? 10000 : 1000);
   }
 }
+
+byID("refresh-button").addEventListener("click", () => {
+  if (state.polling) return;
+  window.clearTimeout(state.timer);
+  poll({ manual: true });
+});
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {

@@ -150,7 +150,7 @@ swift test
 
 ## 第一版限制
 
-- GitHub 使用 polling，預設每 30 秒更新；沒有 webhook。手機頁面在前景每秒讀取 Mac 的記憶體 snapshot，背景時降為每 10 秒，但 iOS 仍可能暫停背景 Safari。
+- GitHub 使用 polling，預設每 30 秒更新；沒有 webhook。手機頁面在前景每秒讀取 Mac 的記憶體 snapshot，背景時降為每 10 秒；頁首 **Refresh** 可立即重試這個唯讀讀取。`Last update at` 取 GitHub snapshot、runtime telemetry 與 Codex usage 中最新的來源時間，不以 HTTP 回應時間冒充資料更新。iOS 仍可能暫停背景 Safari。
 - 不讀 runner 上的 Codex JSONL，因此不顯示模型正在修改哪個檔案、執行哪個 shell command、prompt/response 或 raw token activity；Codex capacity 只顯示官方 rate-limit percentage、window 與 reset time。
 - 不發送 native notification；先確認狀態判定在實際 Moments repo 上正確，再決定是否加入。
 - 目前已在 Apple Silicon macOS 以 Swift 6.3.3 / Xcode 26.6 完成 `.app` build、ad-hoc signing、zip 解包與 bounded launch smoke；尚未做 Developer ID notarization 或長時間 polling soak。
