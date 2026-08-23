@@ -36,6 +36,10 @@
 
             self.stageTrack(status)
 
+            if let strategy = AutomationStrategyProgress(observation: self.observation) {
+              self.strategyTrack(strategy)
+            }
+
             HStack(spacing: 7) {
               Text("Issue #\(status.issueNumber)")
               if let pullRequestNumber = status.pullRequestNumber {
@@ -68,6 +72,65 @@
         .accessibilityHint(
           "Local controller telemetry reports execution phase only. GitHub remains authoritative for pull request merge and Issue completion."
         )
+      }
+    }
+
+    private func strategyTrack(_ strategy: AutomationStrategyProgress) -> some View {
+      VStack(alignment: .leading, spacing: 5) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text(strategy.title.uppercased())
+            .font(.system(size: 8, weight: .bold, design: .rounded))
+            .tracking(0.7)
+            .foregroundStyle(.secondary)
+          Spacer(minLength: 4)
+          Text(strategy.currentStepTitle)
+            .font(.system(size: 8, weight: .semibold, design: .rounded))
+            .foregroundStyle(self.accentColor)
+        }
+
+        HStack(spacing: 4) {
+          ForEach(Array(strategy.steps.enumerated()), id: \.offset) { _, step in
+            Text(step.shortLabel)
+              .font(.system(size: 7, weight: .bold, design: .rounded))
+              .foregroundStyle(self.strategyForeground(step.state))
+              .frame(maxWidth: .infinity)
+              .padding(.vertical, 3)
+              .background(self.strategyBackground(step.state), in: Capsule())
+              .overlay {
+                Capsule()
+                  .stroke(self.strategyBorder(step.state), lineWidth: 0.7)
+              }
+          }
+        }
+      }
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(strategy.accessibilitySummary)
+    }
+
+    private func strategyForeground(_ state: AutomationStrategyStepState) -> Color {
+      switch state {
+      case .completed: self.accentColor
+      case .active: .white
+      case .pending: .secondary
+      case .halted: .orange
+      }
+    }
+
+    private func strategyBackground(_ state: AutomationStrategyStepState) -> Color {
+      switch state {
+      case .completed: self.accentColor.opacity(0.16)
+      case .active: self.accentColor
+      case .pending: Color.secondary.opacity(0.08)
+      case .halted: Color.orange.opacity(0.16)
+      }
+    }
+
+    private func strategyBorder(_ state: AutomationStrategyStepState) -> Color {
+      switch state {
+      case .completed: self.accentColor.opacity(0.42)
+      case .active: self.accentColor
+      case .pending: Color.secondary.opacity(0.15)
+      case .halted: Color.orange.opacity(0.55)
       }
     }
 
@@ -178,6 +241,9 @@
         parts.append("pull request not created yet")
       }
       parts.append(self.phaseTime(status, now: now))
+      if let strategy = AutomationStrategyProgress(observation: self.observation) {
+        parts.append(strategy.accessibilitySummary)
+      }
       if let message = self.observation.message { parts.append(message) }
       return parts.joined(separator: ", ")
     }

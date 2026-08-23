@@ -275,6 +275,76 @@ main { display: grid; gap: 14px; }
 .stage-labels span { color: rgba(222,216,237,0.48); font-size: 8px; text-align: center; }
 .stage-labels span.active { color: #e5deff; font-weight: 700; }
 
+.strategy-progress {
+  margin: -5px 0 18px;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  background: rgba(8,7,13,0.15);
+}
+
+.strategy-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.strategy-heading span:first-child {
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.strategy-heading span:last-child {
+  overflow: hidden;
+  color: #e5deff;
+  font-size: 9px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strategy-steps {
+  display: grid;
+  grid-template-columns: repeat(var(--strategy-step-count, 1), minmax(0, 1fr));
+  gap: 4px;
+}
+
+.strategy-step {
+  min-width: 0;
+  padding: 4px 1px;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 999px;
+  color: rgba(222,216,237,0.48);
+  background: rgba(255,255,255,0.045);
+  font-size: 7px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.strategy-step.completed {
+  border-color: rgba(168,148,255,0.35);
+  color: #b9a9ff;
+  background: rgba(128,104,244,0.15);
+}
+
+.strategy-step.active {
+  border-color: transparent;
+  color: white;
+  background: linear-gradient(90deg, #8068f4, #a894ff);
+  box-shadow: 0 0 9px rgba(168,148,255,0.28);
+}
+
+.strategy-step.halted {
+  border-color: rgba(255,189,114,0.40);
+  color: var(--orange);
+  background: rgba(255,189,114,0.10);
+}
+
 .runtime-meta { display: flex; flex-wrap: wrap; gap: 7px; }
 .runtime-meta span,
 .repository-name {

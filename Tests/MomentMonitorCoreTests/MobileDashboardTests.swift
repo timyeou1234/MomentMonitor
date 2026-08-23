@@ -55,6 +55,9 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertEqual(decoded.runtime.phase, .solReview)
     XCTAssertEqual(decoded.runtime.activeStage, .review)
     XCTAssertEqual(decoded.runtime.roundNumber, 2)
+    XCTAssertEqual(decoded.runtime.strategy?.kind, .reviewLoop)
+    XCTAssertEqual(
+      decoded.runtime.strategy?.steps.map(\.shortLabel), ["R1", "C1", "R2", "C2", "R3", "C3", "R4"])
     XCTAssertTrue(rendered.contains("\"activeStage\":3"))
     XCTAssertEqual(decoded.codexUsage.primary?.remainingPercent, 62)
     XCTAssertEqual(decoded.lanes.first?.items.first?.issueNumber, 237)
@@ -81,6 +84,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(css.contains("@media (min-width: 680px)"))
     XCTAssertTrue(javascript.contains("/api/v1/snapshot"))
     XCTAssertTrue(javascript.contains("renderCodexUsage"))
+    XCTAssertTrue(javascript.contains("renderStrategy"))
     XCTAssertTrue(javascript.contains("const stageOrder = [0, 1, 2, 3, 4]"))
     XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 3"))
     XCTAssertTrue(javascript.contains("textContent"))

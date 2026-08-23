@@ -80,6 +80,31 @@ function runtimeBadge(runtime) {
   }
 }
 
+function renderStrategy(strategy) {
+  const container = byID("strategy-progress");
+  const steps = byID("strategy-steps");
+  steps.replaceChildren();
+  if (!strategy || !Array.isArray(strategy.steps) || !strategy.steps.length) {
+    container.hidden = true;
+    container.removeAttribute("aria-label");
+    return;
+  }
+
+  setText("strategy-title", strategy.title);
+  setText("strategy-current", strategy.currentStepTitle);
+  steps.style.setProperty("--strategy-step-count", String(strategy.steps.length));
+  strategy.steps.forEach((step) => {
+    const node = document.createElement("span");
+    node.className = `strategy-step ${step.kind} ${step.state}`;
+    node.textContent = step.shortLabel;
+    node.setAttribute("aria-hidden", "true");
+    steps.append(node);
+  });
+  const summary = strategy.steps.map((step) => `${step.title} ${step.state}`).join(", ");
+  container.setAttribute("aria-label", `${strategy.title}. ${strategy.currentStepTitle}. ${summary}`);
+  container.hidden = false;
+}
+
 function renderRuntime(runtime, now) {
   const [badge, badgeClass] = runtimeBadge(runtime);
   const badgeNode = byID("runtime-badge");
@@ -109,6 +134,7 @@ function renderRuntime(runtime, now) {
   message.hidden = !runtime.message;
   message.textContent = runtime.message || "";
   renderStages(runtime.activeStage, runtime.outcome === "completed");
+  renderStrategy(runtime.strategy);
 }
 
 function renderCodexUsage(usage) {
