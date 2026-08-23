@@ -72,6 +72,7 @@ public struct MobileRuntimeSummary: Codable, Equatable, Sendable {
   public let roundNumber: Int?
   public let totalRounds: Int?
   public let repairAttempt: Int?
+  public let strategy: AutomationStrategyProgress?
   public let startedAt: Date?
   public let phaseStartedAt: Date?
   public let updatedAt: Date?
@@ -94,6 +95,7 @@ public struct MobileRuntimeSummary: Codable, Equatable, Sendable {
     self.roundNumber = status?.roundNumber
     self.totalRounds = status?.totalRounds
     self.repairAttempt = status?.repairAttempt
+    self.strategy = AutomationStrategyProgress(observation: observation)
     self.startedAt = status?.startedAt
     self.phaseStartedAt = status?.phaseStartedAt
     self.updatedAt = status?.updatedAt

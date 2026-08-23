@@ -32,6 +32,18 @@ Unknown schema/field/phase、unsafe permission、symlink、oversize或矛盾的
 phase/model/role/outcome 都是 `INVALID`。Terminal `completed` 仍須 GitHub 同時證明
 merged automation PR + closed originating Issue，否則明示 awaiting confirmation。
 
+### Multi-round strategy track
+
+Review 與 PR Fast 的巢狀策略軌道只從已驗證 v1 record 的
+`phase`、`round_number`、`total_rounds`、`repair_attempt` 推導。`R1/C1/R2`
+分別代表 review 1、correction 1、review 2；PR Fast 使用 `V1/C1/V2`。
+已經越過的 checkpoint 只表示該 exchange 已完成，不宣稱 review pass。當前
+runner 不再 live 時，當前 checkpoint 顯示 halted；Final Sol High 顯示
+`until pass or a terminal boundary`，不換算成有限百分比。
+
+沒有完整 counters、phase 不屬於這些 loop，或 status 無效時不顯示策略軌道。
+Viewer 不從 GitHub label、elapsed time 或歷史文字補猜缺失的 round。
+
 ## Codex capacity
 
 `Codex capacity` 只接受官方 Codex App Server `account/rateLimits/read` 的 canonical `rateLimits` bucket。畫面以 `100 - usedPercent` 顯示 remaining percentage，並保留 server 提供的 quota window duration 與 reset timestamp；primary 和 secondary window 不會互相相加。
