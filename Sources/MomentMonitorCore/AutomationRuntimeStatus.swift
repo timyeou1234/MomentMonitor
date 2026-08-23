@@ -54,6 +54,26 @@ public enum AutomationRuntimeStage: Int, CaseIterable, Codable, Sendable {
   }
 }
 
+public enum AutomationLifecycleStage: Int, CaseIterable, Codable, Sendable {
+  case implementing
+  case checking
+  case reviewing
+  case publishing
+  case merging
+  case completed
+
+  public var title: String {
+    switch self {
+    case .implementing: "Implement"
+    case .checking: "Check"
+    case .reviewing: "Review"
+    case .publishing: "Publish"
+    case .merging: "Merge"
+    case .completed: "Done"
+    }
+  }
+}
+
 public enum AutomationRuntimePhase: String, Codable, CaseIterable, Sendable {
   case preparingWorkspace = "preparing_workspace"
   case adoptingExistingPR = "adopting_existing_pr"
@@ -114,6 +134,24 @@ public enum AutomationRuntimePhase: String, Codable, CaseIterable, Sendable {
     case .publishingBranch, .creatingPR, .verifyingExactHead, .mergingPR, .closingIssue,
       .completed, .blocked, .failed, .stoppedNoChange:
       .publish
+    }
+  }
+
+  public var lifecycleStage: AutomationLifecycleStage {
+    switch self {
+    case .preparingWorkspace, .adoptingExistingPR, .lunaImplementation, .solCIRepair,
+      .solHighUnblock, .committingCandidate:
+      .implementing
+    case .prFast, .solPRFastRepair:
+      .checking
+    case .solReview, .solReviewRepair, .lunaVerification:
+      .reviewing
+    case .publishingBranch, .creatingPR, .verifyingExactHead:
+      .publishing
+    case .mergingPR, .closingIssue:
+      .merging
+    case .completed, .blocked, .failed, .stoppedNoChange:
+      .completed
     }
   }
 
