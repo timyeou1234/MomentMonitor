@@ -27,6 +27,8 @@
           isRefreshing: self.store.isRefreshing
         )
         Divider()
+        CodexUsageView(observation: self.store.codexUsage)
+        Divider()
         if self.store.snapshot.runtimeObservation.availability != .absent {
           AutomationRuntimeView(observation: self.store.snapshot.runtimeObservation)
           Divider()
@@ -70,7 +72,7 @@
       .background(.regularMaterial)
       .task {
         if self.store.snapshot.items.isEmpty {
-          await self.store.refresh()
+          await self.store.refreshAll()
         }
       }
     }
@@ -95,7 +97,7 @@
           .foregroundStyle(.green)
 
         Button {
-          Task { await self.store.refresh() }
+          Task { await self.store.refreshAll() }
         } label: {
           if self.store.isRefreshing {
             ProgressView()

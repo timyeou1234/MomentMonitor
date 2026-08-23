@@ -142,6 +142,7 @@ footer {
 main { display: grid; gap: 14px; }
 
 .glass-card,
+.usage-card,
 .runtime-card,
 .work-section {
   border: 1px solid var(--line);
@@ -161,6 +162,7 @@ main { display: grid; gap: 14px; }
 }
 
 .progress-card h2,
+.usage-card h2,
 .section-heading-row h2 {
   margin: 7px 0 5px;
   font-size: 21px;
@@ -194,6 +196,25 @@ main { display: grid; gap: 14px; }
 .progress-ring div { z-index: 1; display: flex; align-items: baseline; }
 .progress-ring strong { font-size: 24px; letter-spacing: -0.05em; }
 .progress-ring span { margin-left: 2px; color: var(--muted); font-size: 10px; }
+
+.usage-card {
+  padding: 20px;
+  background: var(--surface);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.usage-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.usage-card h2 { margin: 7px 0 0; }
+.usage-bar { height: 7px; margin: 16px 0 10px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,0.08); }
+.usage-bar span { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #8068f4, #b9a9ff); box-shadow: 0 0 12px rgba(168,148,255,0.30); transition: width 180ms ease; }
+.usage-secondary { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
 
 .runtime-card {
   position: relative;
@@ -328,7 +349,8 @@ footer div { display: flex; align-items: center; gap: 7px; }
   .site-header { margin-bottom: 30px; }
   main { grid-template-columns: 0.86fr 1.14fr; }
   .progress-card { grid-column: 1; min-height: 100%; }
-  .runtime-card { grid-column: 2; }
+  .usage-card { grid-column: 1; }
+  .runtime-card { grid-column: 2; grid-row: 1 / span 2; }
   .work-section { grid-column: 1 / -1; }
   .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }

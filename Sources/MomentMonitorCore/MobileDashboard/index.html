@@ -44,6 +44,21 @@
         </div>
       </section>
 
+      <section class="usage-card glass-card" aria-labelledby="usage-heading">
+        <div class="usage-topline">
+          <div>
+            <p class="section-kicker">CODEX CAPACITY</p>
+            <h2 id="usage-heading"><span id="usage-remaining">—</span>% remaining</h2>
+          </div>
+          <span id="usage-badge" class="status-badge status-idle">WAITING</span>
+        </div>
+        <div id="usage-bar" class="usage-bar" role="progressbar" aria-label="Codex usage unavailable" aria-valuemin="0" aria-valuemax="100">
+          <span id="usage-bar-fill"></span>
+        </div>
+        <p id="usage-detail" class="muted">Waiting for Codex to report current limits.</p>
+        <p id="usage-secondary" class="usage-secondary" hidden></p>
+      </section>
+
       <section id="runtime-card" class="runtime-card" aria-labelledby="runtime-heading">
         <div class="runtime-topline">
           <div>

@@ -9,6 +9,7 @@
 介面依照 Moments 現行自動化生命週期分成：
 
 - **M1 progress**：分母是所有標題以 `[M1]` 開頭的 GitHub Issues，分子是其中 state 為 closed 的 Issues。它不受 automation 是否已排程、lane 是否顯示、Completed 清單上限或 PR 數量影響。
+- **Codex capacity**：透過官方 Codex App Server 唯讀取得目前 quota window 的剩餘百分比與重置時間；不以本機 token 紀錄估算，也不提供額度重置或購買操作。
 - **Current automation**：精確顯示 Luna 開發、PR Fast、Sol review/repair、Luna verification、Sol High unblock、PR publication、exact-head verification、merge 與 Issue closure；包含模型角色、回合、Issue/PR identity、階段耗時與五段 lifecycle track。
 - **Ready**：owner-authored Issue 具有 `dev-ready` 或 `moment:dev-ready` marker，且直接依賴都已關閉；排序與 scheduler 相同。
 - **Waiting on dependencies**：符合 ready 條件，但 `moment:depends-on` 仍有 open Issue。
@@ -41,6 +42,14 @@ gh auth status
 gh api <endpoint> --method GET
 ```
 
+Codex 用量只允許短暫啟動本機 `codex app-server`，完成初始化後呼叫：
+
+```text
+account/rateLimits/read
+```
+
+不會啟動 Codex thread/turn、讀取 token activity、消耗 reset credit 或變更帳號。
+
 沒有下列能力：
 
 ```text
@@ -57,7 +66,7 @@ repository sync
 ~/Library/Application Support/MomentAutomation/runtime/current.json
 ```
 
-它不讀 Moment checkout、不掃 Codex JSONL、不包含 prompt、response、finding、token 或 credential。Viewer 不存在、無法讀取或刪除該檔案時，Moment automation 必須完全不受影響。
+它不讀 Moment checkout、不掃 Codex JSONL，也不讀 prompt、response、finding、raw token count 或 credential。Viewer 不存在、無法讀取或刪除該檔案時，Moment automation 必須完全不受影響。
 
 手機 snapshot 不包含 controller run ID、PID、Git SHA、credential、prompt 或 response；也沒有 CORS、外部 script、持久化 browser cache 或 public hosting。tailnet 中獲准存取的裝置仍可看到 Issue 標題與目前工作狀態，因此應使用 Tailscale ACL 控制成員。詳細 contract 見 [`docs/READ_ONLY_BOUNDARY.md`](docs/READ_ONLY_BOUNDARY.md)。
 
@@ -67,6 +76,7 @@ repository sync
 - Swift 6 toolchain / Xcode
 - GitHub CLI：`brew install gh`
 - 已登入且可讀 private Moment repository：`gh auth login`
+- 選用的 Codex capacity 需要已登入 ChatGPT/Codex 的 Codex CLI；找不到或無法驗證時只顯示 Unavailable，不影響其他監控。
 
 GUI app 從 Finder 啟動時 PATH 通常較短，因此程式會依序尋找：
 
@@ -78,6 +88,8 @@ MOMENT_MONITOR_GH_PATH
 /opt/local/bin/gh
 PATH 中的 gh
 ```
+
+Codex CLI 會依序尋找 `MOMENT_MONITOR_CODEX_PATH`、ChatGPT app 內建路徑、常見 Homebrew／系統路徑及 `PATH`。
 
 Issue 與 PR 會完整分頁；workflow history 只讀最新 100 筆，避免已淘汰或長期累積的歷史 run 超過 refresh timeout 而讓整個 viewer 無法更新。
 
@@ -131,7 +143,7 @@ swift test
 ## 維護方式
 
 - `main` 必須維持可建置、可安裝；功能與修正使用短期 branch 和 pull request。
-- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、50 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
+- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、54 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
 - CI 只使用 synthetic fixtures，不配置 Moment repository credential，也不執行 live refresh。
 - 發布版本使用 semantic version tag（例如 `v0.3.0`）；source 保持公開，但 Developer ID 與 notarization 完成前仍以本機 installer 安裝，不把 ad-hoc signed CI artifact 描述為可公開散佈的正式版本。
 - Moment repository 不保存此 app 的 source copy，也不把它設為 automation dependency。
@@ -139,7 +151,7 @@ swift test
 ## 第一版限制
 
 - GitHub 使用 polling，預設每 30 秒更新；沒有 webhook。手機頁面在前景每秒讀取 Mac 的記憶體 snapshot，背景時降為每 10 秒，但 iOS 仍可能暫停背景 Safari。
-- 不讀 runner 上的 Codex JSONL，因此不顯示模型正在修改哪個檔案、執行哪個 shell command、prompt/response 或 Token 消耗；只顯示 controller 的 bounded phase contract。
+- 不讀 runner 上的 Codex JSONL，因此不顯示模型正在修改哪個檔案、執行哪個 shell command、prompt/response 或 raw token activity；Codex capacity 只顯示官方 rate-limit percentage、window 與 reset time。
 - 不發送 native notification；先確認狀態判定在實際 Moments repo 上正確，再決定是否加入。
 - 目前已在 Apple Silicon macOS 以 Swift 6.3.3 / Xcode 26.6 完成 `.app` build、ad-hoc signing、zip 解包與 bounded launch smoke；尚未做 Developer ID notarization 或長時間 polling soak。
 

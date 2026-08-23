@@ -34,23 +34,36 @@ final class MobileDashboardTests: XCTestCase {
       projectProgress: ProjectProgress(completedCount: 3, totalCount: 8),
       runtimeObservation: .live(status)
     )
-    let store = MobileDashboardSnapshotStore(snapshot: snapshot)
+    let codexUsage = CodexUsageObservation(
+      availability: .live,
+      planType: "pro",
+      primary: CodexUsageWindow(
+        usedPercent: 38,
+        windowDurationMinutes: 10_080,
+        resetsAt: fixedDate("2026-08-28T03:19:49Z")
+      ),
+      fetchedAt: fixedDate("2026-08-22T07:00:00Z")
+    )
+    let store = MobileDashboardSnapshotStore(snapshot: snapshot, codexUsage: codexUsage)
 
     let data = try store.encodedSnapshot(servedAt: fixedDate("2026-08-22T07:00:01Z"))
     let decoded = try JSONDecoder.mobileDashboard.decode(MobileDashboardEnvelope.self, from: data)
     let rendered = String(decoding: data, as: UTF8.self)
 
-    XCTAssertEqual(decoded.schemaVersion, 2)
+    XCTAssertEqual(decoded.schemaVersion, 3)
     XCTAssertEqual(decoded.repository, "timyeou1234/Moment")
     XCTAssertEqual(decoded.runtime.phase, .solReview)
     XCTAssertEqual(decoded.runtime.activeStage, .review)
     XCTAssertEqual(decoded.runtime.roundNumber, 2)
+    XCTAssertEqual(decoded.codexUsage.primary?.remainingPercent, 62)
     XCTAssertEqual(decoded.lanes.first?.items.first?.issueNumber, 237)
     XCTAssertFalse(rendered.contains(status.runID))
     XCTAssertFalse(rendered.contains("runnerPID"))
     XCTAssertFalse(rendered.contains("baseSHA"))
     XCTAssertFalse(rendered.contains("headSHA"))
     XCTAssertFalse(rendered.contains(String(status.runnerPID)))
+    XCTAssertFalse(rendered.contains("planType"))
+    XCTAssertFalse(rendered.contains("lifetimeTokens"))
   }
 
   func testBundledDashboardIsMobileFirstAndUsesNoExternalAssets() throws {
@@ -62,9 +75,12 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(html.contains("width=device-width"))
     XCTAssertTrue(html.contains("apple-mobile-web-app-capable"))
     XCTAssertTrue(html.contains("READ ONLY"))
+    XCTAssertTrue(html.contains("CODEX CAPACITY"))
     XCTAssertTrue(css.contains("env(safe-area-inset-top)"))
     XCTAssertTrue(css.contains("@media (min-width: 680px)"))
     XCTAssertTrue(javascript.contains("/api/v1/snapshot"))
+    XCTAssertTrue(javascript.contains("renderCodexUsage"))
+    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 3"))
     XCTAssertTrue(javascript.contains("textContent"))
     XCTAssertFalse(html.contains("https://"))
     XCTAssertFalse(css.contains("url(http"))

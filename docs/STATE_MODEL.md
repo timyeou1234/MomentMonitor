@@ -32,8 +32,14 @@ Unknown schema/field/phase、unsafe permission、symlink、oversize或矛盾的
 phase/model/role/outcome 都是 `INVALID`。Terminal `completed` 仍須 GitHub 同時證明
 merged automation PR + closed originating Issue，否則明示 awaiting confirmation。
 
+## Codex capacity
+
+`Codex capacity` 只接受官方 Codex App Server `account/rateLimits/read` 的 canonical `rateLimits` bucket。畫面以 `100 - usedPercent` 顯示 remaining percentage，並保留 server 提供的 quota window duration 與 reset timestamp；primary 和 secondary window 不會互相相加。
+
+CLI 不存在、目前 authentication mode 不支援、逾時、欄位缺失或百分比超出 0...100 時會顯示 Unavailable，不沿用舊數值或從本機 token/log 猜測。這份資料不代表帳單餘額，也不授權 viewer 啟動 agent、購買 credits 或消耗 reset credit。
+
 Optional phone dashboard 會把同一份 reconciled state 轉成 versioned、sanitized
-的 `schemaVersion: 2` snapshot。它不另外推算 phase 或 completion：精確的 local
+的 `schemaVersion: 3` snapshot。它不另外推算 phase 或 completion：精確的 local
 phase 仍來自通過驗證的 controller record，merged/closed completion 仍由 GitHub 證明。
 
 ## Workflow relevance
