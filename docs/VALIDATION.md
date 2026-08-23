@@ -1,6 +1,6 @@
 # Validation
 
-## v0.4.2 Codex-capacity candidate
+## v0.4.3 mobile-stage-truth candidate
 
 ```text
 macOS 26.6.2 / Apple Silicon arm64
@@ -20,13 +20,14 @@ Validated boundaries:
 - a sanitized, versioned mobile snapshot that omits run ID, PID and Git SHAs while preserving exact phase, progress and lane truth;
 - an exact read-only Codex App Server allow-list, bounded response decoding, Finder-style executable discovery, quota range validation, and Unavailable failure behavior;
 - Codex capacity rendering from the canonical rate-limit bucket as remaining percentage, window duration and reset time without exposing plan identity or raw token activity;
+- mobile stage rendering maps the schema-v3 integer stage value to the matching five-stage position, with a regression assertion that `sol_review` encodes as Review (`3`);
 - real loopback-server tests for routes, GET/HEAD-only methods, Host validation, security headers, bounded requests and bundled mobile-first assets;
 - source scans that reject public binding, CORS, external web assets, `innerHTML`, `localStorage` and public `.ts.net` matching;
 - strict GET-only source scan;
 - Swift format lint and shell syntax;
 - release app bundle, ad-hoc signature, plist, executable, license resources, and zip round-trip;
 - packaged-app launch with a synthetic, credential-free local phase record;
-- in-place v0.4.2 installation, ad-hoc signature verification, Finder-style launch from `~/Applications`, and version/build confirmation (`0.4.2` / `6`);
+- in-place v0.4.3 installation, ad-hoc signature verification, Finder-style launch from `~/Applications`, and version/build confirmation (`0.4.3` / `7`);
 - packaged and installed dashboard HTTP smoke with real Moment state, confirming the listener is only `127.0.0.1:48127`, the API preserves the bounded runtime result, and security headers forbid caching, framing and cross-origin access;
 - packaged resource loading without falling back to the build worktree, so installed startup does not depend on Documents-folder access or the source checkout remaining present;
 - M1-progress model coverage for visible-row truncation, closed Issues without automation PRs, duplicate merged PRs, non-M1 exclusion, and no M1 scope;
@@ -78,3 +79,9 @@ The phone page polls the app's in-memory snapshot every second while visible and
 - The canonical Codex quota bucket reported `39%` used, so the UI rendered `61% remaining`, a weekly window, and the server-provided reset time. No raw token activity or account identity was included in the mobile snapshot.
 - A 390 × 844 browser viewport rendered the Codex capacity card without horizontal overflow and exposed a `61% Codex capacity remaining` progressbar label. This responsive browser check is not a physical-iPhone claim.
 - The listener remained bound to `127.0.0.1:48127`, Tailscale Serve continued to proxy the private HTTPS route, and Funnel remained disabled.
+
+## Installed v0.4.3 observation
+
+- The installed app reported version/build `0.4.3` / `7`, and its live schema-v3 snapshot reported `sol_review` with `activeStage: 3` for Issue #61.
+- At a 390 × 844 browser viewport, Prepare through Review rendered with the completed gradient, Review was the only active label, and Publish remained unfilled. The page had no horizontal overflow.
+- This verifies the responsive browser rendering and exact live phase mapping; it is not a physical-iPhone accessibility claim.
