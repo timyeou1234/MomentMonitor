@@ -16,7 +16,7 @@ public enum MonitorLane: String, CaseIterable, Codable, Sendable {
     case .queued: "Runner queue"
     case .running: "Running"
     case .prChecks: "PR / Checks"
-    case .blocked: "Blocked / Failed"
+    case .blocked: "Blocked / Owner decision"
     case .completed: "Completed"
     }
   }
