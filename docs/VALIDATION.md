@@ -49,6 +49,7 @@ Validated boundaries:
 - full Swift package build with warnings as errors;
 - deterministic core tests, including bounded pagination, REST PR/run correlation, scheduler ordering, repair-attempt labels, case-insensitive status handling, Finder-style `gh` lookup, truthful local-runner state, and M1 closed/total counting independent of visible row limits;
 - strict local runtime-status tests covering a live PID, dead-PID stale detection, terminal outcomes, repository mismatch, unknown or contradictory fields, owner-only permissions, symbolic-link rejection, and the 16 KiB size boundary;
+- strict Ox audit-status tests covering exact schema/model identity, progress/timeline consistency, stale-state handling, owner-only permissions, unknown-field rejection and the 4 KiB size boundary;
 - reconciliation tests proving that a precise local phase replaces only the matching broad GitHub running row, while GitHub remains authoritative for merged/closed completion;
 - a sanitized, versioned mobile snapshot that omits run ID, PID and Git SHAs while preserving exact phase, progress and lane truth;
 - an exact read-only Codex App Server allow-list, bounded response decoding, Finder-style executable discovery, quota range validation, and Unavailable failure behavior;

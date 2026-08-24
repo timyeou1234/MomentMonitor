@@ -20,6 +20,9 @@
     @Published private(set) var codexUsage: CodexUsageObservation {
       didSet { self.mobileDashboardSnapshotStore.updateCodexUsage(self.codexUsage) }
     }
+    @Published private(set) var oxAudit: OxAuditObservation {
+      didSet { self.mobileDashboardSnapshotStore.updateOxAudit(self.oxAudit) }
+    }
     @Published private(set) var isCodexUsageRefreshing = false
     @Published private(set) var settingsFeedback: String?
     @Published private(set) var settingsFeedbackIsError = false
@@ -34,7 +37,9 @@
     private var pollingTask: Task<Void, Never>?
     private var runtimePollingTask: Task<Void, Never>?
     private var codexUsagePollingTask: Task<Void, Never>?
+    private var oxAuditPollingTask: Task<Void, Never>?
     private var codexUsageClient: CodexUsageClient?
+    private let oxAuditReader = OxAuditStatusReader.live()
     private let defaults: UserDefaults
     private let mobileDashboardSnapshotStore: MobileDashboardSnapshotStore
     private lazy var mobileDashboardServer: MobileDashboardServer? = {
@@ -66,9 +71,11 @@
       let initialCodexUsage = CodexUsageObservation.unavailable(message: "Not refreshed yet.")
       self.snapshot = initialSnapshot
       self.codexUsage = initialCodexUsage
+      self.oxAudit = .absent
       self.mobileDashboardSnapshotStore = MobileDashboardSnapshotStore(
         snapshot: initialSnapshot,
-        codexUsage: initialCodexUsage
+        codexUsage: initialCodexUsage,
+        oxAudit: .absent
       )
 
       Self.logger.info(
@@ -78,6 +85,7 @@
       self.restartPolling()
       self.startRuntimePolling()
       self.startCodexUsagePolling()
+      self.startOxAuditPolling()
       self.restartMobileDashboard()
       Task { await self.refreshAll() }
     }
@@ -191,6 +199,11 @@
     func refreshAll() async {
       await self.refresh()
       await self.refreshCodexUsage()
+      await self.refreshOxAudit()
+    }
+
+    func refreshOxAudit() async {
+      self.oxAudit = await self.oxAuditReader.read()
     }
 
     func refreshCodexUsage() async {
@@ -320,6 +333,17 @@
           try? await Task.sleep(for: .seconds(60))
           guard let self, !Task.isCancelled else { return }
           await self.refreshCodexUsage()
+        }
+      }
+    }
+
+    private func startOxAuditPolling() {
+      self.oxAuditPollingTask?.cancel()
+      self.oxAuditPollingTask = Task { [weak self] in
+        while !Task.isCancelled {
+          guard let self else { return }
+          await self.refreshOxAudit()
+          try? await Task.sleep(for: .seconds(1))
         }
       }
     }

@@ -25,6 +25,7 @@ Moment Monitor 可以把 Mac 上已經判定完成的唯讀 snapshot 顯示在 i
 
 - M1 closed/total progress；
 - Codex quota remaining percentage、window 與 reset time；
+- Ox Alpha Free 的可用／掃描／退避／完成／停止狀態、目前 Issue、完成數、最後 HTTP 狀態與下次重試時間；
 - Luna、Sol Fast、Sol High 的目前 phase、role、round 和 repair attempt；
 - 由 controller v1/v2/v3 round/repair counters 推導的 Review、PR Fast 與 Final Sol High 策略軌道；已完成、目前、待執行與 halted checkpoint 分開顯示，不推測 review pass 或未知百分比；
 - controller v2 發布的 Exec／App Server 即時活動來源、allow-listed 動作、狀態、更新時間、計數與最多四筆最近事件；
@@ -47,7 +48,7 @@ Safari，所以回到頁面時才會立即重新連線。連線暫時中斷時�
 
 頁首 **Refresh** 可立即重新向 Mac 讀取 snapshot，適合從背景回來或連線恢復後
 手動重試；它不會啟動 automation，也不會修改 GitHub、controller status 或 Codex。
-`Last update at` 顯示 GitHub snapshot、runtime telemetry 與 Codex usage 中最新的來源
+`Last update at` 顯示 GitHub snapshot、runtime telemetry、Ox audit 與 Codex usage 中最新的來源
 時間；頁尾 `Received …` 只表示手機最近成功收到 Mac 回應的時間。兩者刻意分開，
 避免把傳輸成功誤認為資料已改變。
 

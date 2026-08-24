@@ -73,13 +73,26 @@ final class MobileDashboardTests: XCTestCase {
       ),
       fetchedAt: fixedDate("2026-08-22T07:00:00Z")
     )
-    let store = MobileDashboardSnapshotStore(snapshot: snapshot, codexUsage: codexUsage)
+    let oxStatus = OxAuditStatus(
+      state: .backoff,
+      currentIssue: 436,
+      completedCount: 3,
+      totalCount: 21,
+      lastHTTPStatus: 503,
+      updatedAt: fixedDate("2026-08-22T07:00:00Z"),
+      nextAttemptAt: fixedDate("2026-08-22T07:10:00Z")
+    )
+    let store = MobileDashboardSnapshotStore(
+      snapshot: snapshot,
+      codexUsage: codexUsage,
+      oxAudit: .current(oxStatus)
+    )
 
     let data = try store.encodedSnapshot(servedAt: fixedDate("2026-08-22T07:00:01Z"))
     let decoded = try JSONDecoder.mobileDashboard.decode(MobileDashboardEnvelope.self, from: data)
     let rendered = String(decoding: data, as: UTF8.self)
 
-    XCTAssertEqual(decoded.schemaVersion, 4)
+    XCTAssertEqual(decoded.schemaVersion, 5)
     XCTAssertEqual(decoded.repository, "timyeou1234/Moment")
     XCTAssertEqual(decoded.runtime.phase, .solReview)
     XCTAssertEqual(decoded.runtime.activeStage, .review)
@@ -92,6 +105,11 @@ final class MobileDashboardTests: XCTestCase {
       decoded.runtime.strategy?.steps.map(\.shortLabel), ["R1", "C1", "R2", "C2", "R3", "C3", "R4"])
     XCTAssertTrue(rendered.contains("\"activeStage\":3"))
     XCTAssertEqual(decoded.codexUsage.primary?.remainingPercent, 62)
+    XCTAssertEqual(decoded.oxAudit.state, .backoff)
+    XCTAssertEqual(decoded.oxAudit.issueNumber, 436)
+    XCTAssertEqual(decoded.oxAudit.completedCount, 3)
+    XCTAssertEqual(decoded.oxAudit.totalCount, 21)
+    XCTAssertEqual(decoded.oxAudit.lastHTTPStatus, 503)
     XCTAssertEqual(decoded.lanes.first?.items.first?.issueNumber, 237)
     XCTAssertEqual(
       decoded.lanes.first?.items.first?.automationDurationMilliseconds, 3_601_000)
@@ -102,6 +120,8 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertFalse(rendered.contains(String(status.runnerPID)))
     XCTAssertFalse(rendered.contains("planType"))
     XCTAssertFalse(rendered.contains("lifetimeTokens"))
+    XCTAssertFalse(rendered.contains("prompt"))
+    XCTAssertFalse(rendered.contains("response"))
 
     let oldActivityEnvelope = MobileDashboardEnvelope(
       snapshot: snapshot,
@@ -121,6 +141,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(html.contains("apple-mobile-web-app-capable"))
     XCTAssertTrue(html.contains("READ ONLY"))
     XCTAssertTrue(html.contains("CODEX CAPACITY"))
+    XCTAssertTrue(html.contains("OX FREE ISSUE SWEEP"))
     XCTAssertTrue(html.contains("id=\"refresh-button\""))
     XCTAssertTrue(html.contains("id=\"last-update-time\""))
     XCTAssertTrue(html.contains("id=\"runtime-activity\""))
@@ -128,6 +149,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(css.contains("@media (min-width: 680px)"))
     XCTAssertTrue(javascript.contains("/api/v1/snapshot"))
     XCTAssertTrue(javascript.contains("renderCodexUsage"))
+    XCTAssertTrue(javascript.contains("renderOxAudit"))
     XCTAssertTrue(javascript.contains("usage?.availability === \"stale\""))
     XCTAssertTrue(javascript.contains("renderStrategy"))
     XCTAssertTrue(javascript.contains("renderActivity"))
@@ -135,7 +157,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("latestDataUpdate"))
     XCTAssertTrue(javascript.contains("poll({ manual: true })"))
     XCTAssertTrue(javascript.contains("const stageOrder = [0, 1, 2, 3, 4]"))
-    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 4"))
+    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 5"))
     XCTAssertTrue(javascript.contains("elapsedMilliseconds"))
     XCTAssertTrue(javascript.contains("Codex —"))
     XCTAssertTrue(javascript.contains("textContent"))

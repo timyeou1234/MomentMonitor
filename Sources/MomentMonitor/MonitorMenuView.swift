@@ -29,6 +29,10 @@
         Divider()
         CodexUsageView(observation: self.store.codexUsage)
         Divider()
+        if self.store.oxAudit.availability != .absent {
+          OxAuditView(observation: self.store.oxAudit)
+          Divider()
+        }
         if self.store.snapshot.runtimeObservation.availability != .absent {
           AutomationRuntimeView(observation: self.store.snapshot.runtimeObservation)
           Divider()

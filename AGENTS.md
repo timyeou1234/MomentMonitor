@@ -10,10 +10,10 @@ phase detail without becoming an operational dependency.
 
 - Never add a GitHub mutation endpoint or UI control.
 - Never invoke git against the Moment checkout.
-- Never ask GitHub workflows to publish observer state. The only permitted local
-  integration is the credential-free, controller-owned
-  `MomentAutomation/runtime/current.json` contract; viewer absence or failure
-  must have no effect on automation.
+- Never ask GitHub workflows to publish observer state. Permitted local inputs are the
+  credential-free, producer-owned `MomentAutomation/runtime/current.json` and
+  `MomentAutomation/runtime/ox-current.json` contracts; viewer absence or failure
+  must have no effect on automation or the optional Ox audit.
 - Never classify a successful workflow run as completed work; completion requires a merged automation PR and a closed originating Issue.
 - Keep the optional phone dashboard disabled by default and bound only to
   `127.0.0.1`. Remote access may use Tailscale Serve, never Funnel or public
