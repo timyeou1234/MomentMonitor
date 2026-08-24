@@ -6,7 +6,7 @@
 | Waiting | Open owner-authored Issue + `dev-ready` or `moment:dev-ready` marker | At least one direct dependency is open. |
 | Runner queue | Relevant workflow run | Status is `queued`, `waiting`, `pending`, or `requested`. |
 | Running | Relevant workflow run | Status is `in_progress`; jobs endpoint supplies the current job/step when available. |
-| Running (local/exact) | Valid `moment.automation-runtime.v1` + live runner PID + matching repository/Issue | Exact controller phase, model role, round, phase duration, and optional PR identity. The local record replaces a duplicate broad workflow/label row. |
+| Running (local/exact) | Valid `moment.automation-runtime.v1`/`v2`/`v3` + live runner PID + matching repository/Issue | Exact controller phase, model role, round, phase duration, optional PR identity, and v3 controller-active Issue time. The local record replaces a duplicate broad workflow/label row. |
 | Running (local/fallback) | Open Issue + `dev-running` | Used only when no valid exact telemetry is available. The label remains active and is not reclassified as stale from elapsed time alone. |
 | PR / Checks | Open automation PR | No matching active Codex/PR Fast run. Latest PR Fast conclusion is shown when available. |
 | Blocked | Open Issue + `dev-blocked` | Automation explicitly stopped this Issue. |
@@ -34,7 +34,7 @@ merged automation PR + closed originating Issue，否則明示 awaiting confirma
 
 ### Multi-round strategy track
 
-Review 與 PR Fast 的巢狀策略軌道只從已驗證 v1 record 的
+Review 與 PR Fast 的巢狀策略軌道只從已驗證 v1/v2/v3 record 的
 `phase`、`round_number`、`total_rounds`、`repair_attempt` 推導。`R1/C1/R2`
 分別代表 review 1、correction 1、review 2；PR Fast 使用 `V1/C1/V2`。
 已經越過的 checkpoint 只表示該 exchange 已完成，不宣稱 review pass。當前
@@ -53,7 +53,7 @@ Viewer 不從 GitHub label、elapsed time 或歷史文字補猜缺失的 round�
 CLI 不存在、目前 authentication mode 不支援、逾時、欄位缺失或百分比超出 0...100 時會顯示 Unavailable，不沿用舊數值或從本機 token/log 猜測。這份資料不代表帳單餘額，也不授權 viewer 啟動 agent、購買 credits 或消耗 reset credit。
 
 Optional phone dashboard 會把同一份 reconciled state 轉成 versioned、sanitized
-的 `schemaVersion: 3` snapshot。它不另外推算 phase 或 completion：精確的 local
+的 `schemaVersion: 4` snapshot。它不另外推算 phase 或 completion：精確的 local
 phase 仍來自通過驗證的 controller record，merged/closed completion 仍由 GitHub 證明。
 
 ## Workflow relevance

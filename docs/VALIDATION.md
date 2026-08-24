@@ -1,5 +1,20 @@
 # Validation
 
+## v0.4.8 per-Issue Codex-time candidate
+
+Validated on macOS 26.6.2 / Apple Silicon with 70 XCTest cases and 0 failures:
+
+- strict runtime-status v1/v2 backward compatibility plus v3 Issue-duration decoding;
+- duplicate, negative, oversized, missing-current-Issue, unknown-field and over-bound duration data fail closed;
+- every Issue-backed Mac/mobile work item displays recorded Codex controller time when present;
+- only the current Issue adds live time, and only while its exact controller PID remains live;
+- mobile snapshot schema v4 carries no controller run ID, PID, SHA, command, path, prompt, response, reasoning or credential.
+- Browser QA at `390 × 844` and `320 × 568` rendered current and completed Issue durations with no horizontal overflow; manual Refresh retained the duration state.
+
+The installed viewer must be upgraded before the Moment controller begins
+publishing v3. Historical work predating v3 is not reconstructed from GitHub
+timestamps. Physical-iPhone and assistive-technology conformance remain unverified.
+
 ## v0.4.7 live-activity candidate
 
 Validated on macOS 26.6.2 / Apple Silicon with 67 XCTest cases and 0 failures:

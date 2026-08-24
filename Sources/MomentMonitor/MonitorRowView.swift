@@ -45,6 +45,16 @@
 
               Spacer(minLength: 4)
 
+              if let duration = self.item.automationDurationMilliseconds {
+                Text("Codex \(RelativeTimeFormatter.compactDuration(milliseconds: duration))")
+                  .font(.caption2.monospacedDigit().weight(.medium))
+                  .foregroundStyle(self.statusColor)
+                  .lineLimit(1)
+                  .accessibilityLabel(
+                    "Recorded Codex time \(RelativeTimeFormatter.compactDuration(milliseconds: duration))"
+                  )
+              }
+
               Text(RelativeTimeFormatter.relativeDescription(from: self.item.updatedAt))
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(.tertiary)

@@ -418,6 +418,47 @@ final class MomentStateBuilderTests: XCTestCase {
     XCTAssertTrue(snapshot.items(in: .completed).isEmpty)
   }
 
+  func testRecordedCodexDurationAppearsOnEveryIssueAndTicksOnlyForLiveCurrentIssue() {
+    let readyIssue = issue(750, title: "Recorded earlier", labels: ["dev-ready"])
+    let runningIssue = issue(751, title: "Running now", labels: ["dev-running"])
+    let status = runtimeStatus(
+      issueNumber: 751,
+      issueDurations: [
+        AutomationIssueDuration(issueNumber: 750, durationMilliseconds: 60_000),
+        AutomationIssueDuration(issueNumber: 751, durationMilliseconds: 120_000),
+      ]
+    )
+
+    let live = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [readyIssue, runningIssue],
+      pullRequests: [],
+      workflowRuns: [],
+      runtimeObservation: .live(status)
+    )
+
+    XCTAssertEqual(
+      live.items.first(where: { $0.issueNumber == 750 })?.automationDurationMilliseconds,
+      60_000
+    )
+    XCTAssertEqual(
+      live.items.first(where: { $0.issueNumber == 751 })?.automationDurationMilliseconds,
+      1_920_000
+    )
+
+    let stale = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [readyIssue, runningIssue],
+      pullRequests: [],
+      workflowRuns: [],
+      runtimeObservation: .stale(status, message: "The controller process is gone.")
+    )
+    XCTAssertEqual(
+      stale.items.first(where: { $0.issueNumber == 751 })?.automationDurationMilliseconds,
+      120_000
+    )
+  }
+
   func testControllerCompletionRemainsUnconfirmedUntilGitHubTruthMatches() {
     let openIssue = issue(742, title: "Publishing completion", labels: ["dev-pr-open"])
     let status = runtimeStatus(

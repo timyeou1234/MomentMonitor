@@ -60,6 +60,7 @@ public struct MonitorItem: Identifiable, Codable, Hashable, Sendable {
   public let workflowRunID: Int64?
   public let url: URL
   public let updatedAt: Date
+  public let automationDurationMilliseconds: Int64?
   public let severity: MonitorSeverity
   public let priorityRank: Int
   public let sequenceNumber: Int
@@ -76,6 +77,7 @@ public struct MonitorItem: Identifiable, Codable, Hashable, Sendable {
     workflowRunID: Int64? = nil,
     url: URL,
     updatedAt: Date,
+    automationDurationMilliseconds: Int64? = nil,
     severity: MonitorSeverity = .normal,
     priorityRank: Int = 2,
     sequenceNumber: Int = .max
@@ -91,9 +93,30 @@ public struct MonitorItem: Identifiable, Codable, Hashable, Sendable {
     self.workflowRunID = workflowRunID
     self.url = url
     self.updatedAt = updatedAt
+    self.automationDurationMilliseconds = automationDurationMilliseconds
     self.severity = severity
     self.priorityRank = priorityRank
     self.sequenceNumber = sequenceNumber
+  }
+
+  public func withAutomationDuration(milliseconds: Int64?) -> Self {
+    Self(
+      id: self.id,
+      lane: self.lane,
+      source: self.source,
+      title: self.title,
+      detail: self.detail,
+      statusText: self.statusText,
+      issueNumber: self.issueNumber,
+      pullRequestNumber: self.pullRequestNumber,
+      workflowRunID: self.workflowRunID,
+      url: self.url,
+      updatedAt: self.updatedAt,
+      automationDurationMilliseconds: milliseconds,
+      severity: self.severity,
+      priorityRank: self.priorityRank,
+      sequenceNumber: self.sequenceNumber
+    )
   }
 }
 

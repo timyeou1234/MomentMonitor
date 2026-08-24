@@ -1,7 +1,7 @@
 import Foundation
 
 public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
-  public static let schemaVersion = 3
+  public static let schemaVersion = 4
 
   public let schemaVersion: Int
   public let repository: String
@@ -34,7 +34,13 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
         return MobileDashboardLane(
           lane: lane,
           title: lane.title,
-          items: items.map(MobileDashboardItem.init)
+          items: items.map {
+            MobileDashboardItem(
+              item: $0,
+              runtimeObservation: snapshot.runtimeObservation,
+              servedAt: servedAt
+            )
+          }
         )
       }
   }
@@ -78,6 +84,7 @@ public struct MobileRuntimeSummary: Codable, Equatable, Sendable {
   public let startedAt: Date?
   public let phaseStartedAt: Date?
   public let updatedAt: Date?
+  public let issueDurationMilliseconds: Int64?
 
   public init(observation: AutomationRuntimeObservation, now: Date = Date()) {
     let status = observation.status
@@ -104,6 +111,11 @@ public struct MobileRuntimeSummary: Codable, Equatable, Sendable {
     self.startedAt = status?.startedAt
     self.phaseStartedAt = status?.phaseStartedAt
     self.updatedAt = status?.updatedAt
+    self.issueDurationMilliseconds = status?.observedDurationMilliseconds(
+      for: status?.issueNumber ?? 0,
+      at: now,
+      runnerIsLive: observation.availability == .live
+    )
   }
 }
 
@@ -128,9 +140,14 @@ public struct MobileDashboardItem: Codable, Equatable, Sendable {
   public let pullRequestNumber: Int?
   public let url: URL
   public let updatedAt: Date
+  public let automationDurationMilliseconds: Int64?
   public let severity: MonitorSeverity
 
-  public init(item: MonitorItem) {
+  public init(
+    item: MonitorItem,
+    runtimeObservation: AutomationRuntimeObservation = .absent,
+    servedAt: Date = Date()
+  ) {
     self.lane = item.lane
     self.title = item.title
     self.detail = item.detail
@@ -139,6 +156,18 @@ public struct MobileDashboardItem: Codable, Equatable, Sendable {
     self.pullRequestNumber = item.pullRequestNumber
     self.url = item.url
     self.updatedAt = item.updatedAt
+    if let issueNumber = item.issueNumber,
+      let status = runtimeObservation.status,
+      let duration = status.observedDurationMilliseconds(
+        for: issueNumber,
+        at: servedAt,
+        runnerIsLive: runtimeObservation.availability == .live
+      )
+    {
+      self.automationDurationMilliseconds = duration
+    } else {
+      self.automationDurationMilliseconds = item.automationDurationMilliseconds
+    }
     self.severity = item.severity
   }
 }

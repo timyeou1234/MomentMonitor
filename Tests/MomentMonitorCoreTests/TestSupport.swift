@@ -151,12 +151,14 @@ func runtimeStatus(
   totalRounds: Int? = nil,
   repairAttempt: Int? = nil,
   phaseStartedAt: Date = fixedDate("2026-08-21T13:30:00Z"),
-  activity: AutomationRuntimeActivity? = nil
+  activity: AutomationRuntimeActivity? = nil,
+  issueDurations: [AutomationIssueDuration]? = nil
 ) -> AutomationRuntimeStatus {
   AutomationRuntimeStatus(
-    schemaVersion: activity == nil ? 1 : 2,
-    formatVersion: activity == nil
-      ? "moment.automation-runtime.v1" : "moment.automation-runtime.v2",
+    schemaVersion: issueDurations == nil ? (activity == nil ? 1 : 2) : 3,
+    formatVersion: issueDurations == nil
+      ? (activity == nil ? "moment.automation-runtime.v1" : "moment.automation-runtime.v2")
+      : "moment.automation-runtime.v3",
     repository: "timyeou1234/Moment",
     runID: "run-\(issueNumber)",
     issueNumber: issueNumber,
@@ -177,6 +179,7 @@ func runtimeStatus(
     updatedAt: phaseStartedAt,
     baseSHA: String(repeating: "a", count: 40),
     headSHA: String(repeating: "b", count: 40),
-    activity: activity
+    activity: activity,
+    issueDurations: issueDurations
   )
 }

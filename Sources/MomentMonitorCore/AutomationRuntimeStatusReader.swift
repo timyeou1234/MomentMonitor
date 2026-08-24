@@ -116,11 +116,20 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
     guard let schemaVersion = object["schema_version"] as? Int else {
       throw RuntimeStatusReadError.unsupportedSchema
     }
-    let allowedKeys = schemaVersion == 1 ? Self.version1Keys : Self.version2Keys
+    let allowedKeys =
+      switch schemaVersion {
+      case 1: Self.version1Keys
+      case 2: Self.version2Keys
+      case 3: Self.version3Keys
+      default: throw RuntimeStatusReadError.unsupportedSchema
+      }
     guard Set(object.keys) == allowedKeys else {
       throw RuntimeStatusReadError.unknownFields
     }
     try Self.validateRawActivity(object["activity"], schemaVersion: schemaVersion)
+    try Self.validateRawIssueDurations(
+      object["issue_durations"], schemaVersion: schemaVersion
+    )
 
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .custom { decoder in
@@ -151,6 +160,7 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
     let supportedSchema =
       (status.schemaVersion == 1 && status.formatVersion == "moment.automation-runtime.v1")
       || (status.schemaVersion == 2 && status.formatVersion == "moment.automation-runtime.v2")
+      || (status.schemaVersion == 3 && status.formatVersion == "moment.automation-runtime.v3")
     guard supportedSchema
     else { throw RuntimeStatusReadError.unsupportedSchema }
     guard Self.isRepository(status.repository),
@@ -184,7 +194,32 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
     } else if let activity = status.activity {
       try Self.validateActivity(activity, status: status)
     }
+    if status.schemaVersion < 3 {
+      guard status.issueDurations == nil else {
+        throw RuntimeStatusReadError.invalidIssueDurations
+      }
+    } else {
+      try Self.validateIssueDurations(status)
+    }
     try Self.validatePhaseSemantics(status)
+  }
+
+  private static func validateIssueDurations(_ status: AutomationRuntimeStatus) throws {
+    guard let durations = status.issueDurations,
+      !durations.isEmpty,
+      durations.count <= 192
+    else { throw RuntimeStatusReadError.invalidIssueDurations }
+    var observed = Set<Int>()
+    for duration in durations {
+      guard duration.issueNumber > 0,
+        duration.durationMilliseconds >= 0,
+        duration.durationMilliseconds <= 315_360_000_000,
+        observed.insert(duration.issueNumber).inserted
+      else { throw RuntimeStatusReadError.invalidIssueDurations }
+    }
+    guard observed.contains(status.issueNumber) else {
+      throw RuntimeStatusReadError.invalidIssueDurations
+    }
   }
 
   private static func validateActivity(
@@ -223,11 +258,25 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
       guard raw == nil else { throw RuntimeStatusReadError.unknownFields }
       return
     }
-    guard schemaVersion == 2 else { throw RuntimeStatusReadError.unsupportedSchema }
+    guard [2, 3].contains(schemaVersion) else {
+      throw RuntimeStatusReadError.unsupportedSchema
+    }
     if raw == nil || raw is NSNull { return }
     guard let activity = raw as? [String: Any], Set(activity.keys) == Self.activityKeys,
       let recent = activity["recent"] as? [[String: Any]],
       recent.allSatisfy({ Set($0.keys) == Self.activityEventKeys })
+    else { throw RuntimeStatusReadError.unknownFields }
+  }
+
+  private static func validateRawIssueDurations(_ raw: Any?, schemaVersion: Int) throws {
+    if schemaVersion < 3 {
+      guard raw == nil else { throw RuntimeStatusReadError.unknownFields }
+      return
+    }
+    guard schemaVersion == 3,
+      let durations = raw as? [[String: Any]],
+      !durations.isEmpty,
+      durations.allSatisfy({ Set($0.keys) == Self.issueDurationKeys })
     else { throw RuntimeStatusReadError.unknownFields }
   }
 
@@ -295,6 +344,7 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
     "phase_started_at", "updated_at", "base_sha", "head_sha",
   ]
   private static let version2Keys = version1Keys.union(["activity"])
+  private static let version3Keys = version2Keys.union(["issue_durations"])
   private static let activityKeys: Set<String> = [
     "schema_version", "source", "sequence", "kind", "state", "action", "observed_at",
     "completed_commands", "failed_commands", "completed_file_changes", "completed_tools",
@@ -303,6 +353,7 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
   private static let activityEventKeys: Set<String> = [
     "sequence", "kind", "state", "action", "observed_at",
   ]
+  private static let issueDurationKeys: Set<String> = ["issue_number", "duration_ms"]
 
   #if os(macOS)
     private static var userID: UInt32 { Darwin.getuid() }
@@ -332,6 +383,7 @@ enum RuntimeStatusReadError: LocalizedError {
   case invalidRound
   case invalidPhase
   case invalidActivity
+  case invalidIssueDurations
 
   var errorDescription: String? {
     switch self {
@@ -349,6 +401,7 @@ enum RuntimeStatusReadError: LocalizedError {
     case .invalidRound: "Local runtime status has an invalid round counter."
     case .invalidPhase: "Local runtime status phase, model, role, and outcome disagree."
     case .invalidActivity: "Local runtime activity is inconsistent."
+    case .invalidIssueDurations: "Local runtime Issue durations are inconsistent."
     }
   }
 }

@@ -36,7 +36,11 @@ final class MobileDashboardTests: XCTestCase {
       role: .reviewer,
       roundNumber: 2,
       totalRounds: 4,
-      activity: activity
+      phaseStartedAt: activityDate,
+      activity: activity,
+      issueDurations: [
+        AutomationIssueDuration(issueNumber: 237, durationMilliseconds: 3_600_000)
+      ]
     )
     let snapshot = MomentMonitorSnapshot(
       repository: .moment,
@@ -52,6 +56,7 @@ final class MobileDashboardTests: XCTestCase {
           issueNumber: 237,
           url: URL(string: "https://github.com/timyeou1234/Moment/issues/237")!,
           updatedAt: status.updatedAt,
+          automationDurationMilliseconds: 3_600_000,
           severity: .active
         )
       ],
@@ -74,7 +79,7 @@ final class MobileDashboardTests: XCTestCase {
     let decoded = try JSONDecoder.mobileDashboard.decode(MobileDashboardEnvelope.self, from: data)
     let rendered = String(decoding: data, as: UTF8.self)
 
-    XCTAssertEqual(decoded.schemaVersion, 3)
+    XCTAssertEqual(decoded.schemaVersion, 4)
     XCTAssertEqual(decoded.repository, "timyeou1234/Moment")
     XCTAssertEqual(decoded.runtime.phase, .solReview)
     XCTAssertEqual(decoded.runtime.activeStage, .review)
@@ -82,11 +87,14 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertEqual(decoded.runtime.strategy?.kind, .reviewLoop)
     XCTAssertEqual(decoded.runtime.activity?.source, .appServer)
     XCTAssertEqual(decoded.runtime.activity?.action, .test)
+    XCTAssertEqual(decoded.runtime.issueDurationMilliseconds, 3_601_000)
     XCTAssertEqual(
       decoded.runtime.strategy?.steps.map(\.shortLabel), ["R1", "C1", "R2", "C2", "R3", "C3", "R4"])
     XCTAssertTrue(rendered.contains("\"activeStage\":3"))
     XCTAssertEqual(decoded.codexUsage.primary?.remainingPercent, 62)
     XCTAssertEqual(decoded.lanes.first?.items.first?.issueNumber, 237)
+    XCTAssertEqual(
+      decoded.lanes.first?.items.first?.automationDurationMilliseconds, 3_601_000)
     XCTAssertFalse(rendered.contains(status.runID))
     XCTAssertFalse(rendered.contains("runnerPID"))
     XCTAssertFalse(rendered.contains("baseSHA"))
@@ -127,7 +135,8 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("latestDataUpdate"))
     XCTAssertTrue(javascript.contains("poll({ manual: true })"))
     XCTAssertTrue(javascript.contains("const stageOrder = [0, 1, 2, 3, 4]"))
-    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 3"))
+    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 4"))
+    XCTAssertTrue(javascript.contains("elapsedMilliseconds"))
     XCTAssertTrue(javascript.contains("textContent"))
     XCTAssertFalse(html.contains("https://"))
     XCTAssertFalse(css.contains("url(http"))
