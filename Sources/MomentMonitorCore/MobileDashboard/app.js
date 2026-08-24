@@ -65,6 +65,7 @@ function latestDataUpdate(snapshot) {
   const candidates = [
     snapshot.generatedAt,
     snapshot.runtime?.updatedAt,
+    snapshot.runtime?.activity?.observedAt,
     snapshot.codexUsage?.fetchedAt
   ]
     .filter(Boolean)
@@ -145,6 +146,60 @@ function renderStrategy(strategy) {
   container.hidden = false;
 }
 
+function activityTitle(action, state) {
+  const titles = {
+    model: ["Model turn", "Model turn"],
+    inspect: ["Inspecting files", "File inspection"],
+    repository: ["Checking repository", "Repository check"],
+    test: ["Running tests", "Tests"],
+    build: ["Building project", "Build"],
+    format: ["Formatting code", "Formatting"],
+    package: ["Resolving packages", "Package resolution"],
+    command: ["Running command", "Command"],
+    file_change: ["Applying file changes", "File changes"],
+    tool: ["Using tool", "Tool call"],
+    plan: ["Updating plan", "Plan update"],
+    agent: ["Preparing response", "Response"]
+  };
+  const labels = titles[action] || ["Worker activity", "Worker activity"];
+  if (state === "completed") return `${labels[1]} completed`;
+  if (state === "failed") return `${labels[1]} failed`;
+  return labels[0];
+}
+
+function renderActivity(activity, now, isLive) {
+  const container = byID("runtime-activity");
+  const recent = byID("activity-recent");
+  recent.replaceChildren();
+  if (!isLive || !activity) {
+    container.hidden = true;
+    return;
+  }
+  const source = activity.source === "app_server" ? "APP SERVER" : "CODEX EXEC";
+  setText("activity-source", source);
+  setText("activity-title", activityTitle(activity.action, activity.state));
+  setText("activity-time", relativeTime(activity.observedAt, now));
+  setText(
+    "activity-counts",
+    `${activity.completedCommands} commands · ${activity.completedFileChanges} file changes · ${activity.completedTools} tools${activity.failedCommands ? ` · ${activity.failedCommands} failed` : ""}`
+  );
+  (activity.recent || []).slice(-4).reverse().forEach((event) => {
+    const item = document.createElement("li");
+    const title = document.createElement("span");
+    title.textContent = activityTitle(event.action, event.state);
+    const time = document.createElement("time");
+    time.dateTime = event.observedAt;
+    time.textContent = relativeTime(event.observedAt, now);
+    item.append(title, time);
+    recent.append(item);
+  });
+  container.setAttribute(
+    "aria-label",
+    `${source}. ${activityTitle(activity.action, activity.state)}. Updated ${relativeTime(activity.observedAt, now)}.`
+  );
+  container.hidden = false;
+}
+
 function renderRuntime(runtime, now) {
   const [badge, badgeClass] = runtimeBadge(runtime);
   const badgeNode = byID("runtime-badge");
@@ -175,6 +230,7 @@ function renderRuntime(runtime, now) {
   message.textContent = runtime.message || "";
   renderStages(runtime.activeStage, runtime.outcome === "completed");
   renderStrategy(runtime.strategy);
+  renderActivity(runtime.activity, now, runtime.availability === "live");
 }
 
 function renderCodexUsage(usage) {

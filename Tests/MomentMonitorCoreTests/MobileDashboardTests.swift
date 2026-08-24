@@ -5,6 +5,29 @@ import XCTest
 
 final class MobileDashboardTests: XCTestCase {
   func testEnvelopePublishesDisplayStateWithoutLocalProcessIdentity() throws {
+    let activityDate = fixedDate("2026-08-22T07:00:00Z")
+    let activity = AutomationRuntimeActivity(
+      schemaVersion: 1,
+      source: .appServer,
+      sequence: 2,
+      kind: .command,
+      state: .completed,
+      action: .test,
+      observedAt: activityDate,
+      completedCommands: 1,
+      failedCommands: 0,
+      completedFileChanges: 0,
+      completedTools: 0,
+      recent: [
+        AutomationActivityEvent(
+          sequence: 2,
+          kind: .command,
+          state: .completed,
+          action: .test,
+          observedAt: activityDate
+        )
+      ]
+    )
     let status = runtimeStatus(
       issueNumber: 237,
       phase: .solReview,
@@ -12,7 +35,8 @@ final class MobileDashboardTests: XCTestCase {
       model: .sol,
       role: .reviewer,
       roundNumber: 2,
-      totalRounds: 4
+      totalRounds: 4,
+      activity: activity
     )
     let snapshot = MomentMonitorSnapshot(
       repository: .moment,
@@ -56,6 +80,8 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertEqual(decoded.runtime.activeStage, .review)
     XCTAssertEqual(decoded.runtime.roundNumber, 2)
     XCTAssertEqual(decoded.runtime.strategy?.kind, .reviewLoop)
+    XCTAssertEqual(decoded.runtime.activity?.source, .appServer)
+    XCTAssertEqual(decoded.runtime.activity?.action, .test)
     XCTAssertEqual(
       decoded.runtime.strategy?.steps.map(\.shortLabel), ["R1", "C1", "R2", "C2", "R3", "C3", "R4"])
     XCTAssertTrue(rendered.contains("\"activeStage\":3"))
@@ -68,6 +94,13 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertFalse(rendered.contains(String(status.runnerPID)))
     XCTAssertFalse(rendered.contains("planType"))
     XCTAssertFalse(rendered.contains("lifetimeTokens"))
+
+    let oldActivityEnvelope = MobileDashboardEnvelope(
+      snapshot: snapshot,
+      codexUsage: codexUsage,
+      servedAt: fixedDate("2026-08-22T07:02:01Z")
+    )
+    XCTAssertNil(oldActivityEnvelope.runtime.activity)
   }
 
   func testBundledDashboardIsMobileFirstAndUsesNoExternalAssets() throws {
@@ -82,12 +115,15 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(html.contains("CODEX CAPACITY"))
     XCTAssertTrue(html.contains("id=\"refresh-button\""))
     XCTAssertTrue(html.contains("id=\"last-update-time\""))
+    XCTAssertTrue(html.contains("id=\"runtime-activity\""))
     XCTAssertTrue(css.contains("env(safe-area-inset-top)"))
     XCTAssertTrue(css.contains("@media (min-width: 680px)"))
     XCTAssertTrue(javascript.contains("/api/v1/snapshot"))
     XCTAssertTrue(javascript.contains("renderCodexUsage"))
     XCTAssertTrue(javascript.contains("usage?.availability === \"stale\""))
     XCTAssertTrue(javascript.contains("renderStrategy"))
+    XCTAssertTrue(javascript.contains("renderActivity"))
+    XCTAssertTrue(javascript.contains("activityTitle"))
     XCTAssertTrue(javascript.contains("latestDataUpdate"))
     XCTAssertTrue(javascript.contains("poll({ manual: true })"))
     XCTAssertTrue(javascript.contains("const stageOrder = [0, 1, 2, 3, 4]"))

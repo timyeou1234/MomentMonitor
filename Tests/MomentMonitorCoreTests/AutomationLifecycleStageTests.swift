@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import MomentMonitorCore
 
 final class AutomationLifecycleStageTests: XCTestCase {

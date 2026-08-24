@@ -36,6 +36,135 @@ public enum AutomationRuntimeModel: String, Codable, Sendable {
   }
 }
 
+public enum AutomationActivitySource: String, Codable, Sendable {
+  case exec
+  case appServer = "app_server"
+
+  public var displayName: String {
+    switch self {
+    case .exec: "Codex Exec"
+    case .appServer: "App Server"
+    }
+  }
+}
+
+public enum AutomationActivityKind: String, Codable, Sendable {
+  case turn
+  case command
+  case fileChange = "file_change"
+  case tool
+  case plan
+  case agent
+}
+
+public enum AutomationActivityState: String, Codable, Sendable {
+  case started
+  case completed
+  case failed
+}
+
+public enum AutomationActivityAction: String, Codable, Sendable {
+  case model
+  case inspect
+  case repository
+  case test
+  case build
+  case format
+  case package
+  case command
+  case fileChange = "file_change"
+  case tool
+  case plan
+  case agent
+
+  public var title: String {
+    switch self {
+    case .model: "Model turn"
+    case .inspect: "Inspecting files"
+    case .repository: "Checking repository"
+    case .test: "Running tests"
+    case .build: "Building project"
+    case .format: "Formatting code"
+    case .package: "Resolving packages"
+    case .command: "Running command"
+    case .fileChange: "Applying file changes"
+    case .tool: "Using tool"
+    case .plan: "Updating plan"
+    case .agent: "Preparing response"
+    }
+  }
+
+  public var resultTitle: String {
+    switch self {
+    case .model: "Model turn"
+    case .inspect: "File inspection"
+    case .repository: "Repository check"
+    case .test: "Tests"
+    case .build: "Build"
+    case .format: "Formatting"
+    case .package: "Package resolution"
+    case .command: "Command"
+    case .fileChange: "File changes"
+    case .tool: "Tool call"
+    case .plan: "Plan update"
+    case .agent: "Response"
+    }
+  }
+}
+
+public struct AutomationActivityEvent: Codable, Equatable, Sendable {
+  public let sequence: Int
+  public let kind: AutomationActivityKind
+  public let state: AutomationActivityState
+  public let action: AutomationActivityAction
+  public let observedAt: Date
+
+  private enum CodingKeys: String, CodingKey {
+    case sequence, kind, state, action
+    case observedAt = "observed_at"
+  }
+}
+
+public struct AutomationRuntimeActivity: Codable, Equatable, Sendable {
+  public static let freshnessInterval: TimeInterval = 120
+  public let schemaVersion: Int
+  public let source: AutomationActivitySource
+  public let sequence: Int
+  public let kind: AutomationActivityKind
+  public let state: AutomationActivityState
+  public let action: AutomationActivityAction
+  public let observedAt: Date
+  public let completedCommands: Int
+  public let failedCommands: Int
+  public let completedFileChanges: Int
+  public let completedTools: Int
+  public let recent: [AutomationActivityEvent]
+
+  public var title: String {
+    switch self.state {
+    case .started: self.action.title
+    case .completed: "\(self.action.resultTitle) completed"
+    case .failed: "\(self.action.resultTitle) failed"
+    }
+  }
+
+  public func isRecent(at now: Date, maximumAge: TimeInterval = Self.freshnessInterval) -> Bool {
+    let age = now.timeIntervalSince(self.observedAt)
+    return age >= 0 && age <= maximumAge
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case schemaVersion = "schema_version"
+    case source, sequence, kind, state, action
+    case observedAt = "observed_at"
+    case completedCommands = "completed_commands"
+    case failedCommands = "failed_commands"
+    case completedFileChanges = "completed_file_changes"
+    case completedTools = "completed_tools"
+    case recent
+  }
+}
+
 public enum AutomationRuntimeStage: Int, CaseIterable, Codable, Sendable {
   case prepare
   case develop
@@ -186,6 +315,7 @@ public struct AutomationRuntimeStatus: Codable, Equatable, Sendable {
   public let updatedAt: Date
   public let baseSHA: String?
   public let headSHA: String?
+  public let activity: AutomationRuntimeActivity?
 
   public init(
     schemaVersion: Int = 1,
@@ -209,7 +339,8 @@ public struct AutomationRuntimeStatus: Codable, Equatable, Sendable {
     phaseStartedAt: Date,
     updatedAt: Date,
     baseSHA: String? = nil,
-    headSHA: String? = nil
+    headSHA: String? = nil,
+    activity: AutomationRuntimeActivity? = nil
   ) {
     self.schemaVersion = schemaVersion
     self.formatVersion = formatVersion
@@ -233,6 +364,7 @@ public struct AutomationRuntimeStatus: Codable, Equatable, Sendable {
     self.updatedAt = updatedAt
     self.baseSHA = baseSHA
     self.headSHA = headSHA
+    self.activity = activity
   }
 
   public var phaseDetail: String? {
@@ -268,6 +400,7 @@ public struct AutomationRuntimeStatus: Codable, Equatable, Sendable {
     case updatedAt = "updated_at"
     case baseSHA = "base_sha"
     case headSHA = "head_sha"
+    case activity
   }
 }
 

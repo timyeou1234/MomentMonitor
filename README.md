@@ -10,7 +10,7 @@
 
 - **M1 progress**：分母是所有標題以 `[M1]` 開頭的 GitHub Issues，分子是其中 state 為 closed 的 Issues。它不受 automation 是否已排程、lane 是否顯示、Completed 清單上限或 PR 數量影響。
 - **Codex capacity**：透過官方 Codex App Server 唯讀取得目前 quota window 的剩餘百分比與重置時間；超過 3 分鐘未成功刷新即降為 Stale 並隱藏舊百分比，不以本機 token 紀錄估算，也不提供額度重置或購買操作。
-- **Current automation**：精確顯示 Luna 開發、PR Fast、Sol review/repair、Luna verification、Sol High unblock、PR publication、exact-head verification、merge 與 Issue closure；包含模型角色、回合、Issue/PR identity、階段耗時與五段 lifecycle track。
+- **Current automation**：精確顯示 Luna 開發、PR Fast、Sol review/repair、Luna verification、Sol High unblock、PR publication、exact-head verification、merge 與 Issue closure；包含模型角色、回合、Issue/PR identity、階段耗時、五段 lifecycle track，以及 Exec／App Server 發布的安全即時活動摘要（測試、build、repository 檢查、檔案變更、工具與最近事件）。
 - **Ready**：owner-authored Issue 具有 `dev-ready` 或 `moment:dev-ready` marker，且直接依賴都已關閉；排序與 scheduler 相同。
 - **Waiting on dependencies**：符合 ready 條件，但 `moment:depends-on` 仍有 open Issue。
 - **Runner queue**：若 repository 仍有可見的相關 GitHub Actions run，狀態為 `queued`、`waiting`、`pending` 或 `requested`。
@@ -66,7 +66,7 @@ repository sync
 ~/Library/Application Support/MomentAutomation/runtime/current.json
 ```
 
-它不讀 Moment checkout、不掃 Codex JSONL，也不讀 prompt、response、finding、raw token count 或 credential。Viewer 不存在、無法讀取或刪除該檔案時，Moment automation 必須完全不受影響。
+它不讀 Moment checkout、不掃 Codex JSONL，也不讀 prompt、response、finding、完整命令、路徑、raw token count 或 credential。即時活動只使用 controller 寫入的 allow-listed 類型、狀態、時間與計數。Viewer 不存在、無法讀取或刪除該檔案時，Moment automation 必須完全不受影響。
 
 手機 snapshot 不包含 controller run ID、PID、Git SHA、credential、prompt 或 response；也沒有 CORS、外部 script、持久化 browser cache 或 public hosting。tailnet 中獲准存取的裝置仍可看到 Issue 標題與目前工作狀態，因此應使用 Tailscale ACL 控制成員。詳細 contract 見 [`docs/READ_ONLY_BOUNDARY.md`](docs/READ_ONLY_BOUNDARY.md)。
 

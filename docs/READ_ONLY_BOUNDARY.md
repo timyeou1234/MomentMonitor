@@ -57,8 +57,11 @@ bits 為零、16 KiB size bound、exact field allow-list、known schema/enum、
 timestamp/counter/SHA consistency 與 live PID 檢查。任何不符合都 fail closed；
 repository 不相符則視為與目前 viewer 無關。
 
-這份資料只證明本機 controller 回報的執行 phase，不證明 PR、check、merge 或
-Issue completion。Viewer 不寫入此檔、不讀 checkout，也不把 telemetry 上傳。
+Reader 同時接受 strict v1 phase record 與 strict v2 phase＋activity record。Activity
+只包含 Exec／App Server 來源、allow-listed kind/state/action、時間、計數與最多六筆
+recent event；不包含來源事件文字。這份資料只證明本機 controller 回報的執行
+phase 與最近觀察到的泛化活動，不證明 PR、check、merge 或 Issue completion。
+Viewer 不寫入此檔、不讀 checkout，也不把 telemetry 上傳。
 
 ## Optional mobile dashboard output
 
@@ -77,8 +80,8 @@ Host 只允許 loopback 名稱/位址及 Tailscale Serve 的 `.ts.net` 名稱；
 service worker、`localStorage` 或持久化 private snapshot。
 
 Mobile snapshot 是明確 allow-list：repository、時間、health、project progress、
-Codex quota remaining percentage/window/reset time、sanitized runtime phase 與各 lane item。它刻意不輸出 controller run ID、PID、
-base/head SHA、account identity、credential、prompt、response、finding 或 raw token activity。Issue 標題和工作
+Codex quota remaining percentage/window/reset time、sanitized runtime phase、allow-listed runtime activity 與各 lane item。它刻意不輸出 controller run ID、PID、
+base/head SHA、account identity、credential、prompt、response、finding、完整命令／輸出或 raw token activity。Issue 標題和工作
 狀態本身仍是私人資料；遠端存取只能使用 Tailscale Serve 和適當 ACL，不得使用
 Tailscale Funnel、public tunnel 或公開 hosting。
 
