@@ -52,6 +52,12 @@ App 可以唯讀開啟 controller-owned：
 ~/Library/Application Support/MomentAutomation/runtime/current.json
 ```
 
+以及 optional Ox audit producer-owned：
+
+```text
+~/Library/Application Support/MomentAutomation/runtime/ox-current.json
+```
+
 Reader 使用 `O_NOFOLLOW`、regular-file、current-user owner、group/other mode
 bits 為零、16 KiB size bound、exact field allow-list、known schema/enum、
 timestamp/counter/SHA consistency 與 live PID 檢查。任何不符合都 fail closed；
@@ -66,6 +72,12 @@ Issue duration 只包含 controller 在相鄰、單調 runtime publication 之�
 active wall-clock milliseconds；不使用 GitHub Issue age、token 或推估值，dead-run
 空窗不累計，最多保留 192 個最近觀察的 Issue。
 Viewer 不寫入此檔、不讀 checkout，也不把 telemetry 上傳。
+
+Ox reader 另以 `O_NOFOLLOW`、regular-file、current-user owner、mode 0600、4 KiB
+上限與 exact-field schema 驗證 `ox-current.json`。它只接受模型顯示身分、
+availability state、目前 Issue、完成／總數、最後 HTTP 狀態、更新與下次重試時間；
+不接受 token、prompt、response、classification finding、route credential、PID 或路徑。
+超過 45 分鐘未更新的非終止狀態標成 Stale。Monitor 不會啟動、停止或喚醒 Ox。
 
 ## Optional mobile dashboard output
 
@@ -88,6 +100,8 @@ Codex quota remaining percentage/window/reset time、sanitized runtime phase、a
 base/head SHA、account identity、credential、prompt、response、finding、完整命令／輸出或 raw token activity。Issue 標題和工作
 狀態本身仍是私人資料；遠端存取只能使用 Tailscale Serve 和適當 ACL，不得使用
 Tailscale Funnel、public tunnel 或公開 hosting。
+
+同一 snapshot 可包含上述 bounded Ox audit summary；它不包含模型 usage 或分類內容。
 
 ## Forbidden behavior
 

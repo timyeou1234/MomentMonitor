@@ -203,6 +203,7 @@ main { display: grid; gap: 14px; }
 
 .glass-card,
 .usage-card,
+.ox-card,
 .runtime-card,
 .work-section {
   border: 1px solid var(--line);
@@ -263,6 +264,25 @@ main { display: grid; gap: 14px; }
   backdrop-filter: blur(22px);
   -webkit-backdrop-filter: blur(22px);
 }
+
+.ox-card {
+  padding: 20px;
+  background: linear-gradient(145deg, rgba(101, 77, 185, 0.20), rgba(24, 22, 34, 0.94));
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.ox-card h2 { margin: 7px 0 0; font-size: 21px; letter-spacing: -0.035em; }
+.ox-card .usage-bar span { background: linear-gradient(90deg, #8068f4, #70d9aa); }
+.ox-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  color: var(--muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.ox-card .muted { margin-top: 9px; }
 
 .usage-topline {
   display: flex;

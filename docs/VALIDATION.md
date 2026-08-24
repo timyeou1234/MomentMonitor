@@ -1,16 +1,18 @@
 # Validation
 
-## v0.4.9 explicit per-Issue timing-state candidate
+## v0.5.0 integrated Ox and per-Issue timing candidate
 
-Validated on macOS 26.6.2 / Apple Silicon with 70 XCTest cases and 0 failures:
+Validated on macOS 26.6.2 / Apple Silicon with 73 XCTest cases and 0 failures:
 
 - strict runtime-status v1/v2 backward compatibility plus v3 Issue-duration decoding;
 - duplicate, negative, oversized, missing-current-Issue, unknown-field and over-bound duration data fail closed;
 - every Issue-backed Mac/mobile work item displays recorded Codex controller time when present;
 - only the current Issue adds live time, and only while its exact controller PID remains live;
-- mobile snapshot schema v4 carries no controller run ID, PID, SHA, command, path, prompt, response, reasoning or credential.
+- mobile snapshot schema v5 carries no controller run ID, PID, SHA, command, path, prompt, response, reasoning or credential;
 - Browser QA at `390 × 844` and `320 × 568` rendered current and completed Issue durations with no horizontal overflow; manual Refresh retained the duration state.
 - Issue-backed rows without pre-v3 evidence render `Codex —` with a "not recorded" accessibility label instead of omitting the timing field or inventing history.
+- Ox audit progress and its strict private-safe schema remain available alongside per-Issue timing.
+- The installer rejects an older or equal build unless an explicit recovery override is set, and the package records its source revision.
 
 The installed viewer must be upgraded before the Moment controller begins
 publishing v3. Historical work predating v3 is not reconstructed from GitHub
@@ -49,6 +51,7 @@ Validated boundaries:
 - full Swift package build with warnings as errors;
 - deterministic core tests, including bounded pagination, REST PR/run correlation, scheduler ordering, repair-attempt labels, case-insensitive status handling, Finder-style `gh` lookup, truthful local-runner state, and M1 closed/total counting independent of visible row limits;
 - strict local runtime-status tests covering a live PID, dead-PID stale detection, terminal outcomes, repository mismatch, unknown or contradictory fields, owner-only permissions, symbolic-link rejection, and the 16 KiB size boundary;
+- strict Ox audit-status tests covering exact schema/model identity, progress/timeline consistency, stale-state handling, owner-only permissions, unknown-field rejection and the 4 KiB size boundary;
 - reconciliation tests proving that a precise local phase replaces only the matching broad GitHub running row, while GitHub remains authoritative for merged/closed completion;
 - a sanitized, versioned mobile snapshot that omits run ID, PID and Git SHAs while preserving exact phase, progress and lane truth;
 - an exact read-only Codex App Server allow-list, bounded response decoding, Finder-style executable discovery, quota range validation, and Unavailable failure behavior;

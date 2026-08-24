@@ -231,7 +231,7 @@ public struct ProcessCodexAppServerRunner: CodexAppServerRunning, Sendable {
   static func rateLimitRequestPayload() -> Data {
     let messages =
       [
-        "{\"method\":\"initialize\",\"id\":0,\"params\":{\"clientInfo\":{\"name\":\"moment_monitor\",\"title\":\"Moment Monitor\",\"version\":\"0.4.9\"}}}",
+        "{\"method\":\"initialize\",\"id\":0,\"params\":{\"clientInfo\":{\"name\":\"moment_monitor\",\"title\":\"Moment Monitor\",\"version\":\"0.5.0\"}}}",
         "{\"method\":\"initialized\",\"params\":{}}",
         "{\"method\":\"account/rateLimits/read\",\"id\":\(Self.rateLimitRequestID)}",
       ].joined(separator: "\n") + "\n"

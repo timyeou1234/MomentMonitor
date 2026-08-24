@@ -20,6 +20,14 @@ if grep -nE "$local_write_forbidden" "$runtime_reader"; then
   exit 1
 fi
 
+ox_reader="Sources/MomentMonitorCore/OxAuditStatus.swift"
+grep -q 'O_RDONLY' "$ox_reader"
+grep -q 'O_NOFOLLOW' "$ox_reader"
+if grep -nE "$local_write_forbidden" "$ox_reader"; then
+  echo "Local Ox status reader contains a write-capable operation." >&2
+  exit 1
+fi
+
 dashboard_server="Sources/MomentMonitorCore/MobileDashboardServer.swift"
 grep -q 'loopbackHost = "127.0.0.1"' "$dashboard_server"
 grep -q 'method == "GET" || method == "HEAD"' "$dashboard_server"
@@ -40,6 +48,10 @@ if grep -nE 'account/usage/read|account/rateLimitResetCredit/consume|account/sen
   echo "Codex usage integration exceeds the read-only rate-limit boundary." >&2
   exit 1
 fi
+
+install_script="Scripts/install_app.sh"
+grep -q 'MOMENT_MONITOR_ALLOW_REINSTALL' "$install_script"
+grep -q 'candidate_build <= installed_build' "$install_script"
 
 swift test
 

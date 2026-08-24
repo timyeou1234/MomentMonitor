@@ -40,6 +40,15 @@ function duration(value, now = new Date()) {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
+function untilTime(value, now = new Date()) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  const seconds = Math.max(0, Math.ceil((date.getTime() - now.getTime()) / 1000));
+  if (seconds < 60) return `retry in ${seconds}s`;
+  return `retry in ${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
 function elapsedMilliseconds(value) {
   if (!Number.isFinite(value) || value < 0) return "—";
   const seconds = Math.floor(value / 1000);
@@ -78,7 +87,8 @@ function latestDataUpdate(snapshot) {
     snapshot.generatedAt,
     snapshot.runtime?.updatedAt,
     snapshot.runtime?.activity?.observedAt,
-    snapshot.codexUsage?.fetchedAt
+    snapshot.codexUsage?.fetchedAt,
+    snapshot.oxAudit?.updatedAt
   ]
     .filter(Boolean)
     .map((value) => new Date(value))
@@ -289,6 +299,51 @@ function renderCodexUsage(usage) {
   }
 }
 
+function oxStateTitle(value) {
+  switch (value) {
+    case "starting": return "Starting";
+    case "probing": return "Checking free route";
+    case "available": return "Free route available";
+    case "scanning": return "Reviewing Issues";
+    case "backoff": return "Waiting to retry";
+    case "completed": return "Issue sweep completed";
+    case "stopped": return "Stopped";
+    default: return "Status unavailable";
+  }
+}
+
+function renderOxAudit(ox, now) {
+  const card = byID("ox-card");
+  card.hidden = !ox || ox.availability === "absent";
+  if (card.hidden) return;
+
+  const badge = byID("ox-badge");
+  const progress = byID("ox-progress");
+  const fill = byID("ox-progress-fill");
+  const completed = Number.isInteger(ox.completedCount) ? ox.completedCount : 0;
+  const total = Number.isInteger(ox.totalCount) ? ox.totalCount : 0;
+  const percent = total > 0 ? Math.max(0, Math.min(100, Math.round(completed / total * 100))) : 0;
+
+  setText("ox-heading", oxStateTitle(ox.state));
+  setText("ox-count", `${completed}/${total} Issues`);
+  setText("ox-issue", ox.issueNumber ? `Issue #${ox.issueNumber}` : "Issue —");
+  setText("ox-http", ox.lastHTTPStatus ? `HTTP ${ox.lastHTTPStatus}` : "HTTP —");
+  setText("ox-next", ox.nextAttemptAt ? untilTime(ox.nextAttemptAt, now) : relativeTime(ox.updatedAt, now));
+  fill.style.width = `${percent}%`;
+  progress.setAttribute("aria-valuenow", String(percent));
+  progress.setAttribute("aria-valuemax", "100");
+  progress.setAttribute("aria-label", `${completed} of ${total} Ox Issue classifications completed`);
+
+  const warning = ox.availability === "stale" || ox.state === "backoff";
+  const danger = ox.availability === "invalid";
+  const success = ox.state === "completed";
+  badge.textContent = danger ? "INVALID" : ox.availability === "stale" ? "STALE" : (ox.state || "current").toUpperCase();
+  badge.className = `status-badge ${danger ? "status-danger" : warning ? "status-warning" : success ? "status-success" : "status-live"}`;
+  const message = byID("ox-message");
+  message.textContent = ox.message || "";
+  message.hidden = !ox.message;
+}
+
 function createWorkItem(item, now) {
   const link = document.createElement("a");
   link.className = `work-item item-${item.severity}`;
@@ -408,6 +463,7 @@ function render() {
   ring.setAttribute("aria-label", `${percentage}% closed, ${progress.completedCount} of ${progress.totalCount} M1 Issues`);
 
   renderCodexUsage(snapshot.codexUsage);
+  renderOxAudit(snapshot.oxAudit, now);
   renderRuntime(snapshot.runtime, now);
   renderLanes(snapshot.lanes, now);
 }
@@ -423,7 +479,7 @@ async function poll({ manual = false } = {}) {
     const response = await fetch("/api/v1/snapshot", { cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error(`Snapshot request failed: ${response.status}`);
     const snapshot = await response.json();
-    if (snapshot.schemaVersion !== 4) throw new Error("Unsupported snapshot schema");
+    if (snapshot.schemaVersion !== 5) throw new Error("Unsupported snapshot schema");
     state.snapshot = snapshot;
     state.connected = true;
     state.lastSuccess = new Date(snapshot.servedAt);

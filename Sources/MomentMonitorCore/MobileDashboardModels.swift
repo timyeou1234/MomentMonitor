@@ -1,7 +1,7 @@
 import Foundation
 
 public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
-  public static let schemaVersion = 4
+  public static let schemaVersion = 5
 
   public let schemaVersion: Int
   public let repository: String
@@ -10,12 +10,14 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
   public let health: MonitorHealth
   public let projectProgress: ProjectProgress
   public let codexUsage: MobileCodexUsageSummary
+  public let oxAudit: MobileOxAuditSummary
   public let runtime: MobileRuntimeSummary
   public let lanes: [MobileDashboardLane]
 
   public init(
     snapshot: MomentMonitorSnapshot,
     codexUsage: CodexUsageObservation,
+    oxAudit: OxAuditObservation = .absent,
     servedAt: Date = Date()
   ) {
     self.schemaVersion = Self.schemaVersion
@@ -25,6 +27,7 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
     self.health = snapshot.health
     self.projectProgress = snapshot.projectProgress
     self.codexUsage = MobileCodexUsageSummary(observation: codexUsage, now: servedAt)
+    self.oxAudit = MobileOxAuditSummary(observation: oxAudit)
     self.runtime = MobileRuntimeSummary(observation: snapshot.runtimeObservation, now: servedAt)
     self.lanes = MonitorLane.allCases
       .sorted { $0.sortOrder < $1.sortOrder }
@@ -43,6 +46,32 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
           }
         )
       }
+  }
+}
+
+public struct MobileOxAuditSummary: Codable, Equatable, Sendable {
+  public let availability: OxAuditAvailability
+  public let state: OxAuditState?
+  public let model: String?
+  public let issueNumber: Int?
+  public let completedCount: Int?
+  public let totalCount: Int?
+  public let lastHTTPStatus: Int?
+  public let updatedAt: Date?
+  public let nextAttemptAt: Date?
+  public let message: String?
+
+  public init(observation: OxAuditObservation) {
+    self.availability = observation.availability
+    self.state = observation.status?.state
+    self.model = observation.status?.model
+    self.issueNumber = observation.status?.currentIssue
+    self.completedCount = observation.status?.completedCount
+    self.totalCount = observation.status?.totalCount
+    self.lastHTTPStatus = observation.status?.lastHTTPStatus
+    self.updatedAt = observation.status?.updatedAt
+    self.nextAttemptAt = observation.status?.nextAttemptAt
+    self.message = observation.message
   }
 }
 
@@ -176,13 +205,16 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
   private let lock = NSLock()
   private var snapshot: MomentMonitorSnapshot
   private var codexUsage: CodexUsageObservation
+  private var oxAudit: OxAuditObservation
 
   public init(
     snapshot: MomentMonitorSnapshot,
-    codexUsage: CodexUsageObservation = .unavailable(message: "Not refreshed yet.")
+    codexUsage: CodexUsageObservation = .unavailable(message: "Not refreshed yet."),
+    oxAudit: OxAuditObservation = .absent
   ) {
     self.snapshot = snapshot
     self.codexUsage = codexUsage
+    self.oxAudit = oxAudit
   }
 
   public func update(_ snapshot: MomentMonitorSnapshot) {
@@ -197,8 +229,14 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
     }
   }
 
+  public func updateOxAudit(_ oxAudit: OxAuditObservation) {
+    self.lock.withLock {
+      self.oxAudit = oxAudit
+    }
+  }
+
   public func encodedSnapshot(servedAt: Date = Date()) throws -> Data {
-    let values = self.lock.withLock { (self.snapshot, self.codexUsage) }
+    let values = self.lock.withLock { (self.snapshot, self.codexUsage, self.oxAudit) }
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = [.sortedKeys]
@@ -206,6 +244,7 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
       MobileDashboardEnvelope(
         snapshot: values.0,
         codexUsage: values.1,
+        oxAudit: values.2,
         servedAt: servedAt
       ))
   }
