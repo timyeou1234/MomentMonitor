@@ -109,6 +109,13 @@ Issue 與 PR 會完整分頁；workflow history 只讀最新 100 筆，避免已
 ~/Applications/Moment Monitor.app
 ```
 
+Installer 只接受比現有 App 更高的 build number，避免另一個舊 worktree
+靜默覆蓋新功能。只有刻意復原或重裝完全相同的 build 時，才明確指定：
+
+```bash
+MOMENT_MONITOR_ALLOW_REINSTALL=1 ./Scripts/install_app.sh
+```
+
 若要安裝到其他位置，可指定絕對目錄：
 
 ```bash

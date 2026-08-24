@@ -49,6 +49,10 @@ if grep -nE 'account/usage/read|account/rateLimitResetCredit/consume|account/sen
   exit 1
 fi
 
+install_script="Scripts/install_app.sh"
+grep -q 'MOMENT_MONITOR_ALLOW_REINSTALL' "$install_script"
+grep -q 'candidate_build <= installed_build' "$install_script"
+
 swift test
 
 echo "Read-only contract and tests passed."

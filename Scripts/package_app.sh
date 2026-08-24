@@ -8,6 +8,10 @@ fi
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
+source_revision="$(git rev-parse --verify HEAD)"
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+  source_revision="${source_revision}-dirty"
+fi
 
 swift test
 swift build --configuration release --product MomentMonitor
@@ -48,9 +52,9 @@ cat > "$contents/Info.plist" <<'PLIST'
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.4.9</string>
+  <string>0.5.0</string>
   <key>CFBundleVersion</key>
-  <string>13</string>
+  <string>14</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
@@ -62,6 +66,7 @@ cat > "$contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+plutil -insert MomentMonitorSourceRevision -string "$source_revision" "$contents/Info.plist"
 
 xattr -cr "$app" 2>/dev/null || true
 codesign --force --deep --sign - "$app"

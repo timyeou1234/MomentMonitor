@@ -26,8 +26,10 @@
           }
 
           if let status = self.observation.status {
-            ProgressView(value: Double(status.completedCount), total: Double(max(1, status.totalCount)))
-              .tint(self.color)
+            ProgressView(
+              value: Double(status.completedCount), total: Double(max(1, status.totalCount))
+            )
+            .tint(self.color)
             HStack(spacing: 8) {
               Text("\(status.completedCount)/\(status.totalCount) Issues")
               if let issue = status.currentIssue { Text("#\(issue)") }
@@ -57,7 +59,8 @@
     }
 
     private var color: Color {
-      guard self.observation.availability == .current, let state = self.observation.status?.state else {
+      guard self.observation.availability == .current, let state = self.observation.status?.state
+      else {
         return self.observation.availability == .invalid ? .red : .orange
       }
       switch state {
