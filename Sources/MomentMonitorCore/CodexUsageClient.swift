@@ -1,5 +1,11 @@
 import Foundation
 
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#endif
+
 public protocol CodexUsageReading: Sendable {
   func fetchUsage() async throws -> CodexUsageObservation
 }
@@ -182,10 +188,7 @@ public struct ProcessCodexAppServerRunner: CodexAppServerRunning, Sendable {
 
       defer {
         try? inputHandle.close()
-        if process.isRunning {
-          process.terminate()
-          process.waitUntilExit()
-        }
+        Self.stop(process)
         try? stdoutHandle.close()
         try? stderrHandle.close()
       }
@@ -228,7 +231,7 @@ public struct ProcessCodexAppServerRunner: CodexAppServerRunning, Sendable {
   static func rateLimitRequestPayload() -> Data {
     let messages =
       [
-        "{\"method\":\"initialize\",\"id\":0,\"params\":{\"clientInfo\":{\"name\":\"moment_monitor\",\"title\":\"Moment Monitor\",\"version\":\"0.4.4\"}}}",
+        "{\"method\":\"initialize\",\"id\":0,\"params\":{\"clientInfo\":{\"name\":\"moment_monitor\",\"title\":\"Moment Monitor\",\"version\":\"0.4.6\"}}}",
         "{\"method\":\"initialized\",\"params\":{}}",
         "{\"method\":\"account/rateLimits/read\",\"id\":\(Self.rateLimitRequestID)}",
       ].joined(separator: "\n") + "\n"
@@ -244,6 +247,25 @@ public struct ProcessCodexAppServerRunner: CodexAppServerRunning, Sendable {
       else { return false }
       return id.intValue == Self.rateLimitRequestID
     }
+  }
+
+  private static func stop(_ process: Process) {
+    guard process.isRunning else { return }
+    process.terminate()
+
+    let gracefulDeadline = Date().addingTimeInterval(0.25)
+    while process.isRunning, Date() < gracefulDeadline {
+      Thread.sleep(forTimeInterval: 0.01)
+    }
+
+    if process.isRunning {
+      #if canImport(Darwin)
+        _ = Darwin.kill(process.processIdentifier, SIGKILL)
+      #elseif canImport(Glibc)
+        _ = Glibc.kill(process.processIdentifier, SIGKILL)
+      #endif
+    }
+    if process.isRunning { process.waitUntilExit() }
   }
 }
 

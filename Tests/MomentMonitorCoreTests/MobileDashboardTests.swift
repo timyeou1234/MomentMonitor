@@ -86,6 +86,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(css.contains("@media (min-width: 680px)"))
     XCTAssertTrue(javascript.contains("/api/v1/snapshot"))
     XCTAssertTrue(javascript.contains("renderCodexUsage"))
+    XCTAssertTrue(javascript.contains("usage?.availability === \"stale\""))
     XCTAssertTrue(javascript.contains("renderStrategy"))
     XCTAssertTrue(javascript.contains("latestDataUpdate"))
     XCTAssertTrue(javascript.contains("poll({ manual: true })"))
@@ -96,6 +97,36 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertFalse(css.contains("url(http"))
     XCTAssertFalse(javascript.contains("innerHTML"))
     XCTAssertFalse(javascript.contains("localStorage"))
+  }
+
+  func testEnvelopeDoesNotPublishAnOldCapacityAsLive() throws {
+    let snapshot = MomentMonitorSnapshot.empty(
+      repository: .moment,
+      at: fixedDate("2026-08-24T02:04:00Z")
+    )
+    let usage = CodexUsageObservation(
+      availability: .live,
+      primary: CodexUsageWindow(
+        usedPercent: 44,
+        windowDurationMinutes: 10_080,
+        resetsAt: fixedDate("2026-08-28T01:59:49Z")
+      ),
+      fetchedAt: fixedDate("2026-08-24T02:00:00Z")
+    )
+
+    let envelope = MobileDashboardEnvelope(
+      snapshot: snapshot,
+      codexUsage: usage,
+      servedAt: fixedDate("2026-08-24T02:04:00Z")
+    )
+
+    XCTAssertEqual(envelope.codexUsage.availability, .stale)
+    XCTAssertNil(envelope.codexUsage.primary)
+    XCTAssertEqual(envelope.codexUsage.fetchedAt, fixedDate("2026-08-24T02:00:00Z"))
+    XCTAssertEqual(
+      envelope.codexUsage.message,
+      "Codex capacity has not refreshed recently."
+    )
   }
 
   #if os(macOS)

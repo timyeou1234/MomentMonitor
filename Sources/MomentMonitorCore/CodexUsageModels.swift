@@ -2,6 +2,7 @@ import Foundation
 
 public enum CodexUsageAvailability: String, Codable, Equatable, Sendable {
   case live
+  case stale
   case unavailable
 }
 
@@ -22,6 +23,8 @@ public struct CodexUsageWindow: Codable, Equatable, Sendable {
 }
 
 public struct CodexUsageObservation: Codable, Equatable, Sendable {
+  public static let maximumLiveAge: TimeInterval = 180
+
   public let availability: CodexUsageAvailability
   public let planType: String?
   public let primary: CodexUsageWindow?
@@ -47,5 +50,23 @@ public struct CodexUsageObservation: Codable, Equatable, Sendable {
 
   public static func unavailable(message: String) -> Self {
     Self(availability: .unavailable, message: message)
+  }
+
+  public func enforcingFreshness(
+    at now: Date,
+    maximumAge: TimeInterval = Self.maximumLiveAge
+  ) -> Self {
+    guard self.availability == .live else { return self }
+    guard let fetchedAt = self.fetchedAt,
+      now.timeIntervalSince(fetchedAt) >= -30,
+      now.timeIntervalSince(fetchedAt) <= maximumAge
+    else {
+      return Self(
+        availability: .stale,
+        fetchedAt: self.fetchedAt,
+        message: "Codex capacity has not refreshed recently."
+      )
+    }
+    return self
   }
 }

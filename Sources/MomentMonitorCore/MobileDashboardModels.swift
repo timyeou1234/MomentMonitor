@@ -24,7 +24,7 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
     self.servedAt = servedAt
     self.health = snapshot.health
     self.projectProgress = snapshot.projectProgress
-    self.codexUsage = MobileCodexUsageSummary(observation: codexUsage)
+    self.codexUsage = MobileCodexUsageSummary(observation: codexUsage, now: servedAt)
     self.runtime = MobileRuntimeSummary(observation: snapshot.runtimeObservation)
     self.lanes = MonitorLane.allCases
       .sorted { $0.sortOrder < $1.sortOrder }
@@ -47,12 +47,13 @@ public struct MobileCodexUsageSummary: Codable, Equatable, Sendable {
   public let fetchedAt: Date?
   public let message: String?
 
-  public init(observation: CodexUsageObservation) {
-    self.availability = observation.availability
-    self.primary = observation.primary
-    self.secondary = observation.secondary
-    self.fetchedAt = observation.fetchedAt
-    self.message = observation.message
+  public init(observation: CodexUsageObservation, now: Date = Date()) {
+    let current = observation.enforcingFreshness(at: now)
+    self.availability = current.availability
+    self.primary = current.primary
+    self.secondary = current.secondary
+    self.fetchedAt = current.fetchedAt
+    self.message = current.message
   }
 }
 
