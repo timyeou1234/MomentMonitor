@@ -24,6 +24,110 @@ final class AutomationRuntimeStatusReaderTests: XCTestCase {
     }
   }
 
+  func testReadsVersion2AllowlistedActivityWithoutPrivateLogContent() async throws {
+    try await self.withStatusFile { fileURL in
+      let activity: [String: Any] = [
+        "schema_version": 1,
+        "source": "app_server",
+        "sequence": 2,
+        "kind": "command",
+        "state": "completed",
+        "action": "test",
+        "observed_at": "2026-08-22T06:43:02.000Z",
+        "completed_commands": 1,
+        "failed_commands": 0,
+        "completed_file_changes": 0,
+        "completed_tools": 0,
+        "recent": [
+          [
+            "sequence": 1, "kind": "command", "state": "started", "action": "test",
+            "observed_at": "2026-08-22T06:43:01.000Z",
+          ],
+          [
+            "sequence": 2, "kind": "command", "state": "completed", "action": "test",
+            "observed_at": "2026-08-22T06:43:02.000Z",
+          ],
+        ],
+      ]
+      try self.writeStatus(
+        to: fileURL,
+        overrides: [
+          "schema_version": 2,
+          "format_version": "moment.automation-runtime.v2",
+          "updated_at": "2026-08-22T06:43:02.000Z",
+          "activity": activity,
+        ]
+      )
+      let reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in true }
+      )
+
+      let observation = await reader.read(repository: .moment)
+
+      XCTAssertEqual(observation.availability, .live)
+      XCTAssertEqual(observation.status?.schemaVersion, 2)
+      XCTAssertEqual(observation.status?.activity?.source, .appServer)
+      XCTAssertEqual(observation.status?.activity?.action, .test)
+      XCTAssertEqual(observation.status?.activity?.completedCommands, 1)
+      let encoded = String(
+        data: try JSONSerialization.data(withJSONObject: activity), encoding: .utf8)!
+      XCTAssertFalse(encoded.contains("prompt"))
+      XCTAssertFalse(encoded.contains("command_text"))
+    }
+  }
+
+  func testVersion2ActivityRejectsUnknownNestedFieldsAndInvalidTimeline() async throws {
+    try await self.withStatusFile { fileURL in
+      var activity: [String: Any] = [
+        "schema_version": 1, "source": "exec", "sequence": 1,
+        "kind": "command", "state": "started", "action": "command",
+        "observed_at": "2026-08-22T06:43:01.000Z",
+        "completed_commands": 0, "failed_commands": 0,
+        "completed_file_changes": 0, "completed_tools": 0,
+        "recent": [
+          [
+            "sequence": 1, "kind": "command", "state": "started", "action": "command",
+            "observed_at": "2026-08-22T06:43:01.000Z", "raw_command": "private",
+          ]
+        ],
+      ]
+      try self.writeStatus(
+        to: fileURL,
+        overrides: [
+          "schema_version": 2, "format_version": "moment.automation-runtime.v2",
+          "activity": activity,
+        ]
+      )
+      var reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL, currentUserID: getuid(), processIsAlive: { _ in true })
+      var observation = await reader.read(repository: .moment)
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("outside the public contract") == true)
+
+      activity["recent"] = [
+        [
+          "sequence": 1, "kind": "command", "state": "started", "action": "command",
+          "observed_at": "2026-08-22T07:00:00.000Z",
+        ]
+      ]
+      activity["observed_at"] = "2026-08-22T07:00:00.000Z"
+      try self.writeStatus(
+        to: fileURL,
+        overrides: [
+          "schema_version": 2, "format_version": "moment.automation-runtime.v2",
+          "activity": activity,
+        ]
+      )
+      reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL, currentUserID: getuid(), processIsAlive: { _ in true })
+      observation = await reader.read(repository: .moment)
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("activity") == true)
+    }
+  }
+
   func testDeadRunnerMakesAnActiveRecordStale() async throws {
     try await self.withStatusFile { fileURL in
       try self.writeStatus(to: fileURL)

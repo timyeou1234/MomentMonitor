@@ -27,12 +27,13 @@ Moment Monitor 可以把 Mac 上已經判定完成的唯讀 snapshot 顯示在 i
 - Codex quota remaining percentage、window 與 reset time；
 - Luna、Sol Fast、Sol High 的目前 phase、role、round 和 repair attempt；
 - 由 controller v1 round/repair counters 推導的 Review、PR Fast 與 Final Sol High 策略軌道；已完成、目前、待執行與 halted checkpoint 分開顯示，不推測 review pass 或未知百分比；
+- controller v2 發布的 Exec／App Server 即時活動來源、allow-listed 動作、狀態、更新時間、計數與最多四筆最近事件；
 - Issue / PR identity、phase elapsed time與五段 lifecycle；
 - Ready、Waiting、Running、PR / Checks、Blocked、Completed 等工作清單；
 - 對應的 GitHub deep link。
 
 API 不包含 run ID、PID、base/head Git SHA、credentials、prompt、response、finding、
-token 或 local filesystem path。瀏覽器頁面不會把 snapshot 寫到永久儲存空間。
+完整命令、命令輸出、token 或 local filesystem path。瀏覽器頁面不會把 snapshot 寫到永久儲存空間。
 不過 Issue 標題和工作狀態仍可能是私人資訊；請用 Tailscale ACL 限制 tailnet
 中哪些人或裝置能連到這台 Mac。
 

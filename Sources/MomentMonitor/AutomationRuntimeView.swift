@@ -40,6 +40,12 @@
               self.strategyTrack(strategy)
             }
 
+            if self.observation.availability == .live, let activity = status.activity,
+              activity.isRecent(at: context.date)
+            {
+              self.activitySummary(activity, now: context.date)
+            }
+
             HStack(spacing: 7) {
               Text("Issue #\(status.issueNumber)")
               if let pullRequestNumber = status.pullRequestNumber {
@@ -73,6 +79,38 @@
           "Moment Monitor summarizes the controller lifecycle only. It cannot dispatch, approve, repair, or merge work."
         )
       }
+    }
+
+    private func activitySummary(_ activity: AutomationRuntimeActivity, now: Date) -> some View {
+      VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text("LIVE ACTIVITY")
+            .font(.system(size: 8, weight: .bold, design: .rounded))
+            .tracking(0.7)
+            .foregroundStyle(.secondary)
+          Text(activity.source.displayName.uppercased())
+            .font(.system(size: 7, weight: .bold, design: .rounded))
+            .foregroundStyle(self.accentColor)
+          Spacer(minLength: 4)
+          Text(RelativeTimeFormatter.relativeDescription(from: activity.observedAt, to: now))
+            .font(.system(size: 8, weight: .medium, design: .rounded))
+            .foregroundStyle(.tertiary)
+        }
+
+        HStack(spacing: 6) {
+          Image(systemName: activity.state == .failed ? "exclamationmark.circle.fill" : "waveform")
+            .foregroundStyle(activity.state == .failed ? .orange : self.accentColor)
+          Text(activity.title)
+            .font(.caption2.weight(.semibold))
+          Spacer(minLength: 4)
+          Text("\(activity.completedCommands) commands · \(activity.completedFileChanges) changes")
+            .font(.system(size: 8, design: .monospaced))
+            .foregroundStyle(.secondary)
+        }
+      }
+      .padding(.horizontal, 8)
+      .padding(.vertical, 6)
+      .background(self.accentColor.opacity(0.07), in: RoundedRectangle(cornerRadius: 7))
     }
 
     private func strategyTrack(_ strategy: AutomationStrategyProgress) -> some View {
@@ -256,6 +294,15 @@
       parts.append(self.phaseTime(status, now: now))
       if let strategy = AutomationStrategyProgress(observation: self.observation) {
         parts.append(strategy.accessibilitySummary)
+      }
+      if let activity = status.activity, self.observation.availability == .live,
+        activity.isRecent(at: now)
+      {
+        parts.append(
+          "\(activity.source.displayName), \(activity.title), "
+            + "\(activity.completedCommands) commands and "
+            + "\(activity.completedFileChanges) file changes"
+        )
       }
       if let message = self.observation.message { parts.append(message) }
       return parts.joined(separator: ", ")

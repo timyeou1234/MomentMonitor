@@ -113,9 +113,14 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
     guard data.count <= Self.maximumBytes else { throw RuntimeStatusReadError.sizeLimit }
     let raw = try JSONSerialization.jsonObject(with: data)
     guard let object = raw as? [String: Any] else { throw RuntimeStatusReadError.invalidJSON }
-    guard Set(object.keys) == Self.allowedKeys else {
+    guard let schemaVersion = object["schema_version"] as? Int else {
+      throw RuntimeStatusReadError.unsupportedSchema
+    }
+    let allowedKeys = schemaVersion == 1 ? Self.version1Keys : Self.version2Keys
+    guard Set(object.keys) == allowedKeys else {
       throw RuntimeStatusReadError.unknownFields
     }
+    try Self.validateRawActivity(object["activity"], schemaVersion: schemaVersion)
 
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .custom { decoder in
@@ -143,8 +148,10 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
   }
 
   private static func validate(_ status: AutomationRuntimeStatus) throws {
-    guard status.schemaVersion == 1,
-      status.formatVersion == "moment.automation-runtime.v1"
+    let supportedSchema =
+      (status.schemaVersion == 1 && status.formatVersion == "moment.automation-runtime.v1")
+      || (status.schemaVersion == 2 && status.formatVersion == "moment.automation-runtime.v2")
+    guard supportedSchema
     else { throw RuntimeStatusReadError.unsupportedSchema }
     guard Self.isRepository(status.repository),
       Self.isRunID(status.runID),
@@ -172,7 +179,56 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
         throw RuntimeStatusReadError.invalidIdentity
       }
     }
+    if status.schemaVersion == 1 {
+      guard status.activity == nil else { throw RuntimeStatusReadError.invalidActivity }
+    } else if let activity = status.activity {
+      try Self.validateActivity(activity, status: status)
+    }
     try Self.validatePhaseSemantics(status)
+  }
+
+  private static func validateActivity(
+    _ activity: AutomationRuntimeActivity,
+    status: AutomationRuntimeStatus
+  ) throws {
+    guard activity.schemaVersion == 1,
+      activity.sequence > 0,
+      activity.completedCommands >= 0,
+      activity.failedCommands >= 0,
+      activity.completedFileChanges >= 0,
+      activity.completedTools >= 0,
+      !activity.recent.isEmpty,
+      activity.recent.count <= 6,
+      status.startedAt <= activity.observedAt,
+      activity.observedAt <= status.updatedAt
+    else { throw RuntimeStatusReadError.invalidActivity }
+    var priorSequence = 0
+    var priorDate = status.startedAt
+    for event in activity.recent {
+      guard event.sequence > priorSequence,
+        event.sequence <= activity.sequence,
+        event.observedAt >= priorDate,
+        event.observedAt <= activity.observedAt
+      else { throw RuntimeStatusReadError.invalidActivity }
+      priorSequence = event.sequence
+      priorDate = event.observedAt
+    }
+    guard activity.recent.last?.sequence == activity.sequence else {
+      throw RuntimeStatusReadError.invalidActivity
+    }
+  }
+
+  private static func validateRawActivity(_ raw: Any?, schemaVersion: Int) throws {
+    if schemaVersion == 1 {
+      guard raw == nil else { throw RuntimeStatusReadError.unknownFields }
+      return
+    }
+    guard schemaVersion == 2 else { throw RuntimeStatusReadError.unsupportedSchema }
+    if raw == nil || raw is NSNull { return }
+    guard let activity = raw as? [String: Any], Set(activity.keys) == Self.activityKeys,
+      let recent = activity["recent"] as? [[String: Any]],
+      recent.allSatisfy({ Set($0.keys) == Self.activityEventKeys })
+    else { throw RuntimeStatusReadError.unknownFields }
   }
 
   private static func validatePhaseSemantics(_ status: AutomationRuntimeStatus) throws {
@@ -231,12 +287,21 @@ public struct AutomationRuntimeStatusReader: AutomationRuntimeStatusReading, Sen
     return value.unicodeScalars.allSatisfy(allowed.contains)
   }
 
-  private static let allowedKeys: Set<String> = [
+  private static let version1Keys: Set<String> = [
     "schema_version", "format_version", "repository", "run_id", "issue_number",
     "pull_request_number", "mode", "phase", "last_active_phase", "outcome", "model", "role",
     "round_number",
     "total_rounds", "repair_attempt", "runner_pid", "sequence", "started_at",
     "phase_started_at", "updated_at", "base_sha", "head_sha",
+  ]
+  private static let version2Keys = version1Keys.union(["activity"])
+  private static let activityKeys: Set<String> = [
+    "schema_version", "source", "sequence", "kind", "state", "action", "observed_at",
+    "completed_commands", "failed_commands", "completed_file_changes", "completed_tools",
+    "recent",
+  ]
+  private static let activityEventKeys: Set<String> = [
+    "sequence", "kind", "state", "action", "observed_at",
   ]
 
   #if os(macOS)
@@ -266,6 +331,7 @@ enum RuntimeStatusReadError: LocalizedError {
   case invalidTimeline
   case invalidRound
   case invalidPhase
+  case invalidActivity
 
   var errorDescription: String? {
     switch self {
@@ -282,6 +348,7 @@ enum RuntimeStatusReadError: LocalizedError {
     case .invalidTimeline: "Local runtime status timestamps are inconsistent."
     case .invalidRound: "Local runtime status has an invalid round counter."
     case .invalidPhase: "Local runtime status phase, model, role, and outcome disagree."
+    case .invalidActivity: "Local runtime activity is inconsistent."
     }
   }
 }

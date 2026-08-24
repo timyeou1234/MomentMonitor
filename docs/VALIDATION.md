@@ -1,5 +1,22 @@
 # Validation
 
+## v0.4.7 live-activity candidate
+
+Validated on macOS 26.6.2 / Apple Silicon with 67 XCTest cases and 0 failures:
+
+- strict runtime-status v1 backward compatibility plus v2 activity decoding;
+- exact nested allow-lists reject raw commands and unknown activity fields;
+- Exec and App Server normalize to source, action, state, timestamps and bounded counters without publishing prompt, response, reasoning, command text, paths or output;
+- activity observer failure cannot alter the model turn, and activity writes remain exact-run, active-only, atomic and under 16 KiB;
+- Mac and mobile views render activity source, current action, relative update time, counts and recent events; events older than two minutes are not presented as live;
+- mobile Browser QA at `390 × 844` and `320 × 568` showed the activity card with no horizontal overflow, and manual Refresh completed normally;
+- read-only contract, Swift tests, production packaging, ad-hoc signature verification and installation all passed.
+
+The installed viewer must be upgraded before the Moment controller begins
+publishing v2. This release accepts both v1 and v2, so rollout does not make the
+current v1 record unavailable. Physical-iPhone and assistive-technology
+conformance remain unverified.
+
 ## v0.4.6 Codex-capacity freshness candidate
 
 ```text

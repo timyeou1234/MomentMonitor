@@ -25,7 +25,7 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
     self.health = snapshot.health
     self.projectProgress = snapshot.projectProgress
     self.codexUsage = MobileCodexUsageSummary(observation: codexUsage, now: servedAt)
-    self.runtime = MobileRuntimeSummary(observation: snapshot.runtimeObservation)
+    self.runtime = MobileRuntimeSummary(observation: snapshot.runtimeObservation, now: servedAt)
     self.lanes = MonitorLane.allCases
       .sorted { $0.sortOrder < $1.sortOrder }
       .compactMap { lane in
@@ -74,11 +74,12 @@ public struct MobileRuntimeSummary: Codable, Equatable, Sendable {
   public let totalRounds: Int?
   public let repairAttempt: Int?
   public let strategy: AutomationStrategyProgress?
+  public let activity: AutomationRuntimeActivity?
   public let startedAt: Date?
   public let phaseStartedAt: Date?
   public let updatedAt: Date?
 
-  public init(observation: AutomationRuntimeObservation) {
+  public init(observation: AutomationRuntimeObservation, now: Date = Date()) {
     let status = observation.status
     let effectivePhase = status?.lastActivePhase ?? status?.phase
     self.availability = observation.availability
@@ -97,6 +98,9 @@ public struct MobileRuntimeSummary: Codable, Equatable, Sendable {
     self.totalRounds = status?.totalRounds
     self.repairAttempt = status?.repairAttempt
     self.strategy = AutomationStrategyProgress(observation: observation)
+    self.activity =
+      observation.availability == .live
+        && status?.activity?.isRecent(at: now) == true ? status?.activity : nil
     self.startedAt = status?.startedAt
     self.phaseStartedAt = status?.phaseStartedAt
     self.updatedAt = status?.updatedAt
