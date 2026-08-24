@@ -45,14 +45,15 @@
 
               Spacer(minLength: 4)
 
-              if let duration = self.item.automationDurationMilliseconds {
-                Text("Codex \(RelativeTimeFormatter.compactDuration(milliseconds: duration))")
+              if self.item.issueNumber != nil {
+                Text(self.codexDurationText)
                   .font(.caption2.monospacedDigit().weight(.medium))
-                  .foregroundStyle(self.statusColor)
-                  .lineLimit(1)
-                  .accessibilityLabel(
-                    "Recorded Codex time \(RelativeTimeFormatter.compactDuration(milliseconds: duration))"
+                  .foregroundStyle(
+                    self.item.automationDurationMilliseconds == nil
+                      ? AnyShapeStyle(.tertiary) : AnyShapeStyle(self.statusColor)
                   )
+                  .lineLimit(1)
+                  .accessibilityLabel(self.codexDurationAccessibilityLabel)
               }
 
               Text(RelativeTimeFormatter.relativeDescription(from: self.item.updatedAt))
@@ -66,6 +67,18 @@
         .padding(.vertical, 8)
       }
       .buttonStyle(.plain)
+    }
+
+    private var codexDurationText: String {
+      guard let duration = self.item.automationDurationMilliseconds else { return "Codex —" }
+      return "Codex \(RelativeTimeFormatter.compactDuration(milliseconds: duration))"
+    }
+
+    private var codexDurationAccessibilityLabel: String {
+      guard let duration = self.item.automationDurationMilliseconds else {
+        return "Codex time not recorded"
+      }
+      return "Recorded Codex time \(RelativeTimeFormatter.compactDuration(milliseconds: duration))"
     }
 
     private var symbolName: String {

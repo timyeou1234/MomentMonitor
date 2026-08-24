@@ -137,6 +137,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("const stageOrder = [0, 1, 2, 3, 4]"))
     XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 4"))
     XCTAssertTrue(javascript.contains("elapsedMilliseconds"))
+    XCTAssertTrue(javascript.contains("Codex —"))
     XCTAssertTrue(javascript.contains("textContent"))
     XCTAssertFalse(html.contains("https://"))
     XCTAssertFalse(css.contains("url(http"))

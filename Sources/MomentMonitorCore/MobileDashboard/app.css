@@ -497,6 +497,7 @@ main { display: grid; gap: 14px; }
 .item-timing { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 7px; font-size: 9px; font-variant-numeric: tabular-nums; }
 .item-time { color: #777282; }
 .item-codex-time { color: var(--purple); font-weight: 700; }
+.item-codex-time.unavailable { color: #777282; font-weight: 600; }
 .item-warning .item-status { color: var(--orange); }
 .item-success .item-status { color: var(--green); }
 

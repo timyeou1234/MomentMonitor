@@ -1,6 +1,6 @@
 # Validation
 
-## v0.4.8 per-Issue Codex-time candidate
+## v0.4.9 explicit per-Issue timing-state candidate
 
 Validated on macOS 26.6.2 / Apple Silicon with 70 XCTest cases and 0 failures:
 
@@ -10,6 +10,7 @@ Validated on macOS 26.6.2 / Apple Silicon with 70 XCTest cases and 0 failures:
 - only the current Issue adds live time, and only while its exact controller PID remains live;
 - mobile snapshot schema v4 carries no controller run ID, PID, SHA, command, path, prompt, response, reasoning or credential.
 - Browser QA at `390 × 844` and `320 × 568` rendered current and completed Issue durations with no horizontal overflow; manual Refresh retained the duration state.
+- Issue-backed rows without pre-v3 evidence render `Codex —` with a "not recorded" accessibility label instead of omitting the timing field or inventing history.
 
 The installed viewer must be upgraded before the Moment controller begins
 publishing v3. Historical work predating v3 is not reconstructed from GitHub

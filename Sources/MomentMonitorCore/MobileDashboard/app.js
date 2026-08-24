@@ -315,10 +315,18 @@ function createWorkItem(item, now) {
   time.textContent = `Updated ${relativeTime(item.updatedAt, now)}`;
   const timing = document.createElement("div");
   timing.className = "item-timing";
-  if (item.automationDurationMilliseconds != null) {
+  if (item.issueNumber != null) {
     const codexTime = document.createElement("span");
-    codexTime.className = "item-codex-time";
-    codexTime.textContent = `Codex ${elapsedMilliseconds(item.automationDurationMilliseconds)}`;
+    codexTime.className = `item-codex-time${item.automationDurationMilliseconds == null ? " unavailable" : ""}`;
+    codexTime.textContent = item.automationDurationMilliseconds == null
+      ? "Codex —"
+      : `Codex ${elapsedMilliseconds(item.automationDurationMilliseconds)}`;
+    codexTime.setAttribute(
+      "aria-label",
+      item.automationDurationMilliseconds == null
+        ? "Codex time not recorded"
+        : `Recorded Codex time ${elapsedMilliseconds(item.automationDurationMilliseconds)}`
+    );
     timing.append(codexTime);
   }
   timing.append(time);
