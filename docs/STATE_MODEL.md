@@ -48,6 +48,8 @@ Viewer 不從 GitHub label、elapsed time 或歷史文字補猜缺失的 round�
 
 `Codex capacity` 只接受官方 Codex App Server `account/rateLimits/read` 的 canonical `rateLimits` bucket。畫面以 `100 - usedPercent` 顯示 remaining percentage，並保留 server 提供的 quota window duration 與 reset timestamp；primary 和 secondary window 不會互相相加。
 
+成功 observation 只在 `fetchedAt` 後 3 分鐘內標為 Live。超過門檻、遺失時間或時間明顯位於未來時，Mac 與手機都改顯示 Stale 並移除百分比與 progress bar，避免 App Server 輪詢中斷後把舊值當成目前容量。App Server process 在 request timeout 後先終止、再於 250 ms bounded grace 後強制停止，讓下一次 60 秒 polling 可以恢復。
+
 CLI 不存在、目前 authentication mode 不支援、逾時、欄位缺失或百分比超出 0...100 時會顯示 Unavailable，不沿用舊數值或從本機 token/log 猜測。這份資料不代表帳單餘額，也不授權 viewer 啟動 agent、購買 credits 或消耗 reset credit。
 
 Optional phone dashboard 會把同一份 reconciled state 轉成 versioned、sanitized

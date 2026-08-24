@@ -187,8 +187,9 @@ function renderCodexUsage(usage) {
   if (!primary) {
     setText("usage-remaining", "—");
     setText("usage-detail", usage?.message || "Codex usage is unavailable.");
-    badge.textContent = "UNAVAILABLE";
-    badge.className = "status-badge status-idle";
+    const isStale = usage?.availability === "stale";
+    badge.textContent = isStale ? "STALE" : "UNAVAILABLE";
+    badge.className = `status-badge ${isStale ? "status-warning" : "status-idle"}`;
     fill.style.width = "0%";
     bar.removeAttribute("aria-valuenow");
     bar.setAttribute("aria-label", "Codex usage unavailable");

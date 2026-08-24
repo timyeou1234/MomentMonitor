@@ -9,7 +9,7 @@
 介面依照 Moments 現行自動化生命週期分成：
 
 - **M1 progress**：分母是所有標題以 `[M1]` 開頭的 GitHub Issues，分子是其中 state 為 closed 的 Issues。它不受 automation 是否已排程、lane 是否顯示、Completed 清單上限或 PR 數量影響。
-- **Codex capacity**：透過官方 Codex App Server 唯讀取得目前 quota window 的剩餘百分比與重置時間；不以本機 token 紀錄估算，也不提供額度重置或購買操作。
+- **Codex capacity**：透過官方 Codex App Server 唯讀取得目前 quota window 的剩餘百分比與重置時間；超過 3 分鐘未成功刷新即降為 Stale 並隱藏舊百分比，不以本機 token 紀錄估算，也不提供額度重置或購買操作。
 - **Current automation**：精確顯示 Luna 開發、PR Fast、Sol review/repair、Luna verification、Sol High unblock、PR publication、exact-head verification、merge 與 Issue closure；包含模型角色、回合、Issue/PR identity、階段耗時與五段 lifecycle track。
 - **Ready**：owner-authored Issue 具有 `dev-ready` 或 `moment:dev-ready` marker，且直接依賴都已關閉；排序與 scheduler 相同。
 - **Waiting on dependencies**：符合 ready 條件，但 `moment:depends-on` 仍有 open Issue。
@@ -143,7 +143,7 @@ swift test
 ## 維護方式
 
 - `main` 必須維持可建置、可安裝；功能與修正使用短期 branch 和 pull request。
-- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、59 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
+- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、65 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
 - CI 只使用 synthetic fixtures，不配置 Moment repository credential，也不執行 live refresh。
 - 發布版本使用 semantic version tag（例如 `v0.3.0`）；source 保持公開，但 Developer ID 與 notarization 完成前仍以本機 installer 安裝，不把 ad-hoc signed CI artifact 描述為可公開散佈的正式版本。
 - Moment repository 不保存此 app 的 source copy，也不把它設為 automation dependency。

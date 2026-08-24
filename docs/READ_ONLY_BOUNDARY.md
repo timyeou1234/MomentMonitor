@@ -30,6 +30,9 @@ initialized
 account/rateLimits/read
 ```
 
+每次讀取有 bounded timeout；無回應的 child process 會在短暫 grace period 後停止，
+避免一次卡住永久凍結後續唯讀輪詢。超過 3 分鐘的舊 observation 不再標成 Live。
+
 不呼叫 `account/usage/read`、thread/turn API、reset-credit consumption 或通知／購買操作。CLI 無法定位、未登入、逾時或 response 不符合 bounded schema 時只回報 Unavailable。
 
 ## Allowed endpoints

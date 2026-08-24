@@ -6,6 +6,14 @@
     let observation: CodexUsageObservation
 
     var body: some View {
+      TimelineView(.periodic(from: .now, by: 30)) { context in
+        self.content(
+          observation: self.observation.enforcingFreshness(at: context.date)
+        )
+      }
+    }
+
+    private func content(observation: CodexUsageObservation) -> some View {
       VStack(alignment: .leading, spacing: 8) {
         HStack(spacing: 8) {
           Text("Codex capacity")
@@ -13,20 +21,20 @@
 
           Spacer()
 
-          Text(self.badgeText)
+          Text(self.badgeText(observation: observation))
             .font(.system(size: 9, weight: .bold, design: .rounded))
-            .foregroundStyle(self.observation.availability == .live ? .purple : .secondary)
+            .foregroundStyle(observation.availability == .live ? .purple : .secondary)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
             .background(
-              (self.observation.availability == .live ? Color.purple : Color.secondary)
+              (observation.availability == .live ? Color.purple : Color.secondary)
                 .opacity(0.12),
               in: Capsule()
             )
         }
 
-        if let primary = self.observation.primary,
-          self.observation.availability == .live
+        if let primary = observation.primary,
+          observation.availability == .live
         {
           ProgressView(value: primary.remainingPercent, total: 100)
             .tint(.purple)
@@ -39,7 +47,7 @@
           .font(.caption2.monospacedDigit())
           .foregroundStyle(.secondary)
 
-          if let secondary = self.observation.secondary {
+          if let secondary = observation.secondary {
             Text(
               "\(self.windowTitle(secondary.windowDurationMinutes)): \(self.percent(secondary.remainingPercent)) remaining"
             )
@@ -47,7 +55,7 @@
             .foregroundStyle(.secondary)
           }
         } else {
-          Text(self.observation.message ?? "Codex usage is unavailable.")
+          Text(observation.message ?? "Codex usage is unavailable.")
             .font(.caption2)
             .foregroundStyle(.secondary)
         }
@@ -56,20 +64,20 @@
       .padding(.vertical, 10)
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("Codex capacity")
-      .accessibilityValue(self.accessibilityValue)
+      .accessibilityValue(self.accessibilityValue(observation: observation))
       .accessibilityHint("Read-only Codex quota usage and reset time reported by Codex.")
     }
 
-    private var badgeText: String {
-      guard self.observation.availability == .live, let primary = self.observation.primary else {
-        return "UNAVAILABLE"
+    private func badgeText(observation: CodexUsageObservation) -> String {
+      guard observation.availability == .live, let primary = observation.primary else {
+        return observation.availability == .stale ? "STALE" : "UNAVAILABLE"
       }
       return "\(self.percent(primary.remainingPercent)) LEFT"
     }
 
-    private var accessibilityValue: String {
-      guard self.observation.availability == .live, let primary = self.observation.primary else {
-        return self.observation.message ?? "Unavailable"
+    private func accessibilityValue(observation: CodexUsageObservation) -> String {
+      guard observation.availability == .live, let primary = observation.primary else {
+        return observation.message ?? "Unavailable"
       }
       return
         "\(self.percent(primary.remainingPercent)) remaining in the \(self.windowTitle(primary.windowDurationMinutes).lowercased()), resets \(primary.resetsAt.formatted(date: .complete, time: .shortened))"

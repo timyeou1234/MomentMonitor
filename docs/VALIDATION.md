@@ -1,13 +1,13 @@
 # Validation
 
-## v0.4.4 multi-round-strategy candidate
+## v0.4.6 Codex-capacity freshness candidate
 
 ```text
 macOS 26.6.2 / Apple Silicon arm64
 Xcode 26.6
 Apple Swift 6.3.3
 GitHub CLI 2.97.0
-59 XCTest cases
+65 XCTest cases
 0 failures
 ```
 
@@ -20,6 +20,7 @@ Validated boundaries:
 - a sanitized, versioned mobile snapshot that omits run ID, PID and Git SHAs while preserving exact phase, progress and lane truth;
 - an exact read-only Codex App Server allow-list, bounded response decoding, Finder-style executable discovery, quota range validation, and Unavailable failure behavior;
 - Codex capacity rendering from the canonical rate-limit bucket as remaining percentage, window duration and reset time without exposing plan identity or raw token activity;
+- Codex capacity freshness enforcement that hides percentages after three minutes without a successful read, plus a bounded process test proving an App Server that ignores termination cannot freeze later polling;
 - mobile stage rendering maps the schema-v3 integer stage value to the matching five-stage position, with a regression assertion that `sol_review` encodes as Review (`3`);
 - a pure multi-round strategy derivation distinguishes review, correction, PR Fast validation, halted checkpoints and the unbounded Final Sol High goal without inferring a pass or percentage;
 - Mac and mobile strategy tracks consume the same derived model; the mobile snapshot adds only bounded phase/counter labels and no prompt, response, finding or process identity;
@@ -29,12 +30,20 @@ Validated boundaries:
 - Swift format lint and shell syntax;
 - release app bundle, ad-hoc signature, plist, executable, license resources, and zip round-trip;
 - packaged-app launch with a synthetic, credential-free local phase record;
-- in-place v0.4.4 installation, ad-hoc signature verification, Finder-style launch from `~/Applications`, and version/build confirmation (`0.4.4` / `8`);
+- in-place v0.4.6 installation, ad-hoc signature verification, Finder-style launch from `~/Applications`, and version/build confirmation (`0.4.6` / `10`);
 - packaged and installed dashboard HTTP smoke with real Moment state, confirming the listener is only `127.0.0.1:48127`, the API preserves the bounded runtime result, and security headers forbid caching, framing and cross-origin access;
 - packaged resource loading without falling back to the build worktree, so installed startup does not depend on Documents-folder access or the source checkout remaining present;
 - M1-progress model coverage for visible-row truncation, closed Issues without automation PRs, duplicate merged PRs, non-M1 exclusion, and no M1 scope;
 - compiled five-stage phase track, elapsed-time updates, Issue/PR identity, and combined accessibility label/value/hint semantics;
 - authenticated GET-only live refresh against `timyeou1234/Moment` remains the only GitHub integration.
+
+Installed candidate observation on 2026-08-24:
+
+- installed and launched `Moment Monitor.app` version `0.4.6` (build `10`), then passed strict deep signature verification;
+- the first mobile snapshot reported the canonical weekly bucket as `usedPercent: 2` (`98% remaining`) with `fetchedAt: 2026-08-24T02:03:26Z`;
+- without restarting the app, the next poll advanced `fetchedAt` to `2026-08-24T02:04:19Z` and retained the same canonical value, proving the poller continued after process cleanup;
+- the live dashboard at a `390 × 844` viewport rendered `98% remaining`, `LIVE`, Refresh and Last update at with no horizontal overflow (`scrollWidth: 390`);
+- physical-iPhone accessibility remains unverified; this viewport check proves only the bounded responsive layout and live data presentation.
 
 Commands:
 
