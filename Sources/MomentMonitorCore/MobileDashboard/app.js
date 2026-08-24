@@ -40,6 +40,18 @@ function duration(value, now = new Date()) {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
 }
 
+function elapsedMilliseconds(value) {
+  if (!Number.isFinite(value) || value < 0) return "—";
+  const seconds = Math.floor(value / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours < 24) return remainingMinutes ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
+}
+
 function usageWindowTitle(minutes) {
   if (minutes === 300) return "5-hour window";
   if (minutes === 1440) return "Daily window";
@@ -222,6 +234,12 @@ function renderRuntime(runtime, now) {
   setText("runtime-detail", detail.length ? detail.join(" · ") : "Controller-reported phase; GitHub remains authoritative for completion.");
 
   setText("runtime-issue", runtime.issueNumber ? `Issue #${runtime.issueNumber}` : "Issue —");
+  setText(
+    "runtime-issue-time",
+    runtime.issueDurationMilliseconds == null
+      ? "Codex time not recorded"
+      : `Codex ${elapsedMilliseconds(runtime.issueDurationMilliseconds)}`
+  );
   setText("runtime-pr", runtime.pullRequestNumber ? `PR #${runtime.pullRequestNumber}` : "PR not created yet");
   setText("runtime-time", runtime.availability === "live" ? `${duration(runtime.phaseStartedAt, now)} in phase` : relativeTime(runtime.updatedAt, now));
 
@@ -295,7 +313,16 @@ function createWorkItem(item, now) {
   time.className = "item-time";
   time.dateTime = item.updatedAt;
   time.textContent = `Updated ${relativeTime(item.updatedAt, now)}`;
-  link.append(top, detail, time);
+  const timing = document.createElement("div");
+  timing.className = "item-timing";
+  if (item.automationDurationMilliseconds != null) {
+    const codexTime = document.createElement("span");
+    codexTime.className = "item-codex-time";
+    codexTime.textContent = `Codex ${elapsedMilliseconds(item.automationDurationMilliseconds)}`;
+    timing.append(codexTime);
+  }
+  timing.append(time);
+  link.append(top, detail, timing);
   return link;
 }
 
@@ -388,7 +415,7 @@ async function poll({ manual = false } = {}) {
     const response = await fetch("/api/v1/snapshot", { cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error(`Snapshot request failed: ${response.status}`);
     const snapshot = await response.json();
-    if (snapshot.schemaVersion !== 3) throw new Error("Unsupported snapshot schema");
+    if (snapshot.schemaVersion !== 4) throw new Error("Unsupported snapshot schema");
     state.snapshot = snapshot;
     state.connected = true;
     state.lastSuccess = new Date(snapshot.servedAt);

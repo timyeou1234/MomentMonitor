@@ -78,6 +78,87 @@ final class AutomationRuntimeStatusReaderTests: XCTestCase {
     }
   }
 
+  func testReadsVersion3BoundedPerIssueDurations() async throws {
+    try await self.withStatusFile { fileURL in
+      try self.writeStatus(
+        to: fileURL,
+        overrides: [
+          "schema_version": 3,
+          "format_version": "moment.automation-runtime.v3",
+          "activity": NSNull(),
+          "issue_durations": [
+            ["issue_number": 236, "duration_ms": 125_000],
+            ["issue_number": 237, "duration_ms": 4_205_000],
+          ],
+        ]
+      )
+      let reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL,
+        currentUserID: getuid(),
+        processIsAlive: { _ in true }
+      )
+
+      let observation = await reader.read(repository: .moment)
+
+      XCTAssertEqual(observation.availability, .live)
+      XCTAssertEqual(observation.status?.schemaVersion, 3)
+      XCTAssertEqual(
+        observation.status?.recordedDurationMilliseconds(for: 236), 125_000)
+      XCTAssertEqual(
+        observation.status?.recordedDurationMilliseconds(for: 237), 4_205_000)
+    }
+  }
+
+  func testVersion3DurationsRejectDuplicatesAndMissingCurrentIssue() async throws {
+    try await self.withStatusFile { fileURL in
+      let base: [String: Any] = [
+        "schema_version": 3,
+        "format_version": "moment.automation-runtime.v3",
+        "activity": NSNull(),
+      ]
+      try self.writeStatus(
+        to: fileURL,
+        overrides: base.merging([
+          "issue_durations": [
+            ["issue_number": 237, "duration_ms": 1],
+            ["issue_number": 237, "duration_ms": 2],
+          ]
+        ]) { _, replacement in replacement }
+      )
+      var reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL, currentUserID: getuid(), processIsAlive: { _ in true })
+      var observation = await reader.read(repository: .moment)
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("durations") == true)
+
+      try self.writeStatus(
+        to: fileURL,
+        overrides: base.merging([
+          "issue_durations": [["issue_number": 236, "duration_ms": 1]]
+        ]) { _, replacement in replacement }
+      )
+      reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL, currentUserID: getuid(), processIsAlive: { _ in true })
+      observation = await reader.read(repository: .moment)
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("durations") == true)
+
+      try self.writeStatus(
+        to: fileURL,
+        overrides: base.merging([
+          "issue_durations": (1...192).map { number in
+            ["issue_number": number, "duration_ms": number]
+          } + [["issue_number": 237, "duration_ms": 237]]
+        ]) { _, replacement in replacement }
+      )
+      reader = AutomationRuntimeStatusReader(
+        fileURL: fileURL, currentUserID: getuid(), processIsAlive: { _ in true })
+      observation = await reader.read(repository: .moment)
+      XCTAssertEqual(observation.availability, .invalid)
+      XCTAssertTrue(observation.message?.contains("durations") == true)
+    }
+  }
+
   func testVersion2ActivityRejectsUnknownNestedFieldsAndInvalidTimeline() async throws {
     try await self.withStatusFile { fileURL in
       var activity: [String: Any] = [

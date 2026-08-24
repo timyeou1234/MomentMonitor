@@ -132,6 +132,20 @@ public struct MomentStateBuilder: Sendable {
         limit: configuration.completedItemLimit
       ))
 
+    if let status = reconciledRuntimeObservation.status {
+      let runnerIsLive = reconciledRuntimeObservation.availability == .live
+      items = items.map { item in
+        guard let issueNumber = item.issueNumber else { return item }
+        return item.withAutomationDuration(
+          milliseconds: status.observedDurationMilliseconds(
+            for: issueNumber,
+            at: self.now,
+            runnerIsLive: runnerIsLive
+          )
+        )
+      }
+    }
+
     let m1Issues = issueItems.filter(Self.isM1Issue)
     let closedM1IssueCount = m1Issues.filter { issue in
       issue.state.caseInsensitiveCompare("closed") == .orderedSame

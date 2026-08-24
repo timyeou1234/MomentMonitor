@@ -165,6 +165,21 @@ public struct AutomationRuntimeActivity: Codable, Equatable, Sendable {
   }
 }
 
+public struct AutomationIssueDuration: Codable, Equatable, Sendable {
+  public let issueNumber: Int
+  public let durationMilliseconds: Int64
+
+  public init(issueNumber: Int, durationMilliseconds: Int64) {
+    self.issueNumber = issueNumber
+    self.durationMilliseconds = durationMilliseconds
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case issueNumber = "issue_number"
+    case durationMilliseconds = "duration_ms"
+  }
+}
+
 public enum AutomationRuntimeStage: Int, CaseIterable, Codable, Sendable {
   case prepare
   case develop
@@ -316,6 +331,7 @@ public struct AutomationRuntimeStatus: Codable, Equatable, Sendable {
   public let baseSHA: String?
   public let headSHA: String?
   public let activity: AutomationRuntimeActivity?
+  public let issueDurations: [AutomationIssueDuration]?
 
   public init(
     schemaVersion: Int = 1,
@@ -340,7 +356,8 @@ public struct AutomationRuntimeStatus: Codable, Equatable, Sendable {
     updatedAt: Date,
     baseSHA: String? = nil,
     headSHA: String? = nil,
-    activity: AutomationRuntimeActivity? = nil
+    activity: AutomationRuntimeActivity? = nil,
+    issueDurations: [AutomationIssueDuration]? = nil
   ) {
     self.schemaVersion = schemaVersion
     self.formatVersion = formatVersion
@@ -365,6 +382,24 @@ public struct AutomationRuntimeStatus: Codable, Equatable, Sendable {
     self.baseSHA = baseSHA
     self.headSHA = headSHA
     self.activity = activity
+    self.issueDurations = issueDurations
+  }
+
+  public func recordedDurationMilliseconds(for issueNumber: Int) -> Int64? {
+    self.issueDurations?.first(where: { $0.issueNumber == issueNumber })?.durationMilliseconds
+  }
+
+  public func observedDurationMilliseconds(
+    for issueNumber: Int,
+    at now: Date,
+    runnerIsLive: Bool
+  ) -> Int64? {
+    guard let recorded = self.recordedDurationMilliseconds(for: issueNumber) else {
+      return nil
+    }
+    guard runnerIsLive, issueNumber == self.issueNumber else { return recorded }
+    let liveMilliseconds = Int64(max(0, now.timeIntervalSince(self.updatedAt)) * 1000)
+    return min(315_360_000_000, recorded + liveMilliseconds)
   }
 
   public var phaseDetail: String? {
@@ -401,6 +436,7 @@ public struct AutomationRuntimeStatus: Codable, Equatable, Sendable {
     case baseSHA = "base_sha"
     case headSHA = "head_sha"
     case activity
+    case issueDurations = "issue_durations"
   }
 }
 

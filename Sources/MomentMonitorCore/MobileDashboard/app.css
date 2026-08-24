@@ -494,7 +494,9 @@ main { display: grid; gap: 14px; }
 .item-title { margin: 0; font-size: 13px; font-weight: 650; line-height: 1.32; }
 .item-status { flex: 0 0 auto; color: var(--purple); font-size: 9px; font-weight: 750; text-transform: uppercase; }
 .item-detail { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.42; }
-.item-time { display: block; margin-top: 7px; color: #777282; font-size: 9px; font-variant-numeric: tabular-nums; }
+.item-timing { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 7px; font-size: 9px; font-variant-numeric: tabular-nums; }
+.item-time { color: #777282; }
+.item-codex-time { color: var(--purple); font-weight: 700; }
 .item-warning .item-status { color: var(--orange); }
 .item-success .item-status { color: var(--green); }
 

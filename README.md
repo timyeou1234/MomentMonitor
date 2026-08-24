@@ -143,7 +143,7 @@ swift test
 ## 維護方式
 
 - `main` 必須維持可建置、可安裝；功能與修正使用短期 branch 和 pull request。
-- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、65 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
+- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、70 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
 - CI 只使用 synthetic fixtures，不配置 Moment repository credential，也不執行 live refresh。
 - 發布版本使用 semantic version tag（例如 `v0.3.0`）；source 保持公開，但 Developer ID 與 notarization 完成前仍以本機 installer 安裝，不把 ad-hoc signed CI artifact 描述為可公開散佈的正式版本。
 - Moment repository 不保存此 app 的 source copy，也不把它設為 automation dependency。
@@ -151,6 +151,7 @@ swift test
 ## 第一版限制
 
 - GitHub 使用 polling，預設每 30 秒更新；沒有 webhook。手機頁面在前景每秒讀取 Mac 的記憶體 snapshot，背景時降為每 10 秒；頁首 **Refresh** 可立即重試這個唯讀讀取。`Last update at` 取 GitHub snapshot、runtime telemetry 與 Codex usage 中最新的來源時間，不以 HTTP 回應時間冒充資料更新。iOS 仍可能暫停背景 Safari。
+- 每個有 controller v3 紀錄的 Issue 顯示累計 Codex controller-active wall-clock time；目前執行中的 Issue 只有在 PID 存活時才繼續計時。v3 以前的歷史不會用 GitHub Issue age 猜測補值。
 - 不讀 runner 上的 Codex JSONL，因此不顯示模型正在修改哪個檔案、執行哪個 shell command、prompt/response 或 raw token activity；Codex capacity 只顯示官方 rate-limit percentage、window 與 reset time。
 - 不發送 native notification；先確認狀態判定在實際 Moments repo 上正確，再決定是否加入。
 - 目前已在 Apple Silicon macOS 以 Swift 6.3.3 / Xcode 26.6 完成 `.app` build、ad-hoc signing、zip 解包與 bounded launch smoke；尚未做 Developer ID notarization 或長時間 polling soak。

@@ -1,8 +1,15 @@
 import Foundation
 
 public enum RelativeTimeFormatter {
+  public static func compactDuration(milliseconds: Int64) -> String {
+    self.compactDuration(seconds: max(0, milliseconds / 1000))
+  }
+
   public static func compactDuration(from start: Date, to end: Date) -> String {
-    let seconds = max(0, Int(end.timeIntervalSince(start)))
+    self.compactDuration(seconds: Int64(max(0, end.timeIntervalSince(start))))
+  }
+
+  private static func compactDuration(seconds: Int64) -> String {
     if seconds < 60 {
       return "\(seconds)s"
     }

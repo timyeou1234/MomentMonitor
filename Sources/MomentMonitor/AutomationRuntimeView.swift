@@ -48,6 +48,13 @@
 
             HStack(spacing: 7) {
               Text("Issue #\(status.issueNumber)")
+              if let duration = status.observedDurationMilliseconds(
+                for: status.issueNumber,
+                at: context.date,
+                runnerIsLive: self.observation.availability == .live
+              ) {
+                Text("Codex \(RelativeTimeFormatter.compactDuration(milliseconds: duration))")
+              }
               if let pullRequestNumber = status.pullRequestNumber {
                 Text("PR #\(pullRequestNumber)")
               } else if status.outcome == .active {
