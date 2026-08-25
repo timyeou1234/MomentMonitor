@@ -62,6 +62,36 @@ final class MomentStateBuilderTests: XCTestCase {
     XCTAssertEqual(snapshot.projectProgress, .empty)
   }
 
+  func testBlockedItemsExposeOnlyClosedObserverRecoveryStates() {
+    let snapshot = MomentStateBuilder(now: self.now).build(
+      configuration: MonitorConfiguration(),
+      issues: [
+        issue(
+          436,
+          title: "Automatic recovery",
+          labels: ["dev-blocked", "auto-unblock-sol-high"]
+        ),
+        issue(
+          500,
+          title: "Owner decision",
+          labels: ["dev-blocked", "needs-owner-decision"]
+        ),
+        issue(501, title: "Plain block", labels: ["dev-blocked"]),
+      ],
+      pullRequests: [],
+      workflowRuns: []
+    )
+
+    let statusByIssue = Dictionary(
+      uniqueKeysWithValues: snapshot.items(in: .blocked).compactMap { item in
+        item.issueNumber.map { ($0, item.statusText) }
+      }
+    )
+    XCTAssertEqual(statusByIssue[436], "auto recovery")
+    XCTAssertEqual(statusByIssue[500], "owner decision")
+    XCTAssertEqual(statusByIssue[501], "blocked")
+  }
+
   func testProjectProgressCountsAllCompletedIssuesBeyondTheVisibleCompletedLimit() {
     let issues = [
       issue(800, title: "[M1][Core] Ready next", labels: ["dev-ready"]),

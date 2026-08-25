@@ -44,6 +44,10 @@
               ErrorBanner(message: error)
             }
 
+            if let diagnosis = self.store.developmentDiagnosis {
+              DevelopmentObserverView(diagnosis: diagnosis)
+            }
+
             if self.store.isRefreshing, self.store.snapshot.items.isEmpty {
               HStack {
                 Spacer()

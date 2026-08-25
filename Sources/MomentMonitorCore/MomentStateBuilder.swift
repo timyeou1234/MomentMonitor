@@ -553,9 +553,26 @@ public struct MomentStateBuilder: Sendable {
       guard issue.isOpen, issue.labelNames.contains("dev-blocked") else { return nil }
       let latestRun = latestRunByIssue[issue.number]
       let status = latestRun?.conclusion ?? latestRun?.status
-      let detail =
-        status.map { "Automation stopped · latest run: \($0)" }
-        ?? "Automation stopped; open the Issue for the recorded reason"
+      let needsOwner =
+        issue.labelNames.contains("needs-owner-decision")
+        || (issue.body ?? "").contains("<!-- moment:owner-decision-required -->")
+      let hasAutomaticRecovery =
+        issue.labelNames.contains("auto-unblock-sol-high")
+        && !issue.labelNames.contains("auto-unblock-exhausted")
+      let detail: String
+      let statusText: String
+      if needsOwner {
+        detail = "Automation stopped · a bounded Owner decision is required"
+        statusText = "owner decision"
+      } else if hasAutomaticRecovery {
+        detail = "Automation stopped · existing Codex recovery remains authoritative"
+        statusText = "auto recovery"
+      } else {
+        detail =
+          status.map { "Automation stopped · latest run: \($0)" }
+          ?? "Automation stopped; open the Issue for the recorded reason"
+        statusText = "blocked"
+      }
 
       return MonitorItem(
         id: "blocked:issue:\(issue.number)",
@@ -563,7 +580,7 @@ public struct MomentStateBuilder: Sendable {
         source: .issue,
         title: "#\(issue.number) \(issue.title)",
         detail: detail,
-        statusText: "blocked",
+        statusText: statusText,
         issueNumber: issue.number,
         url: issue.htmlUrl,
         updatedAt: issue.updatedAt,

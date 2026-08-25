@@ -23,12 +23,14 @@
     @Published private(set) var oxAudit: OxAuditObservation {
       didSet { self.mobileDashboardSnapshotStore.updateOxAudit(self.oxAudit) }
     }
+    @Published private(set) var developmentDiagnosis: DevelopmentDiagnosis?
     @Published private(set) var isCodexUsageRefreshing = false
     @Published private(set) var settingsFeedback: String?
     @Published private(set) var settingsFeedbackIsError = false
     @Published var repositoryText: String
     @Published var refreshIntervalSeconds: Int
     @Published var completedItemLimit: Int
+    @Published var localModelObserverEnabled: Bool
     @Published var mobileDashboardEnabled: Bool
     @Published var mobileDashboardPort: Int
     @Published private(set) var mobileDashboardState: MobileDashboardServerState = .stopped
@@ -38,8 +40,11 @@
     private var runtimePollingTask: Task<Void, Never>?
     private var codexUsagePollingTask: Task<Void, Never>?
     private var oxAuditPollingTask: Task<Void, Never>?
+    private var developmentObservationTask: Task<Void, Never>?
+    private var pendingDevelopmentFingerprint: String?
     private var codexUsageClient: CodexUsageClient?
     private let oxAuditReader = OxAuditStatusReader.live()
+    private let developmentObserver = DevelopmentObserver.live()
     private let defaults: UserDefaults
     private let mobileDashboardSnapshotStore: MobileDashboardSnapshotStore
     private lazy var mobileDashboardServer: MobileDashboardServer? = {
@@ -63,6 +68,8 @@
         defaults.string(forKey: "repository") ?? RepositoryCoordinate.moment.fullName
       self.refreshIntervalSeconds = defaults.object(forKey: "refreshIntervalSeconds") as? Int ?? 30
       self.completedItemLimit = defaults.object(forKey: "completedItemLimit") as? Int ?? 8
+      self.localModelObserverEnabled =
+        defaults.object(forKey: "localModelObserverEnabled") as? Bool ?? true
       self.mobileDashboardEnabled = defaults.bool(forKey: "mobileDashboardEnabled")
       self.mobileDashboardPort =
         defaults.object(forKey: "mobileDashboardPort") as? Int
@@ -72,6 +79,7 @@
       self.snapshot = initialSnapshot
       self.codexUsage = initialCodexUsage
       self.oxAudit = .absent
+      self.developmentDiagnosis = nil
       self.mobileDashboardSnapshotStore = MobileDashboardSnapshotStore(
         snapshot: initialSnapshot,
         codexUsage: initialCodexUsage,
@@ -185,12 +193,14 @@
 
         let refreshed = try await service.refresh(configuration: configuration)
         self.snapshot = refreshed
+        self.scheduleDevelopmentObservation(for: refreshed)
         self.hasSuccessfulRefresh = true
         self.lastError = nil
       } catch {
         if let service = self.service, let configuration = try? self.configuration() {
           let runtimeObservation = await service.readRuntimeStatus(configuration: configuration)
           self.snapshot = self.snapshot.replacingRuntimeObservation(runtimeObservation)
+          self.scheduleDevelopmentObservation(for: self.snapshot)
         }
         self.lastError = error.localizedDescription
       }
@@ -251,8 +261,12 @@
       self.defaults.set(self.repositoryText, forKey: "repository")
       self.defaults.set(self.refreshIntervalSeconds, forKey: "refreshIntervalSeconds")
       self.defaults.set(self.completedItemLimit, forKey: "completedItemLimit")
+      self.defaults.set(self.localModelObserverEnabled, forKey: "localModelObserverEnabled")
       self.defaults.set(self.mobileDashboardEnabled, forKey: "mobileDashboardEnabled")
       self.defaults.set(self.mobileDashboardPort, forKey: "mobileDashboardPort")
+      self.developmentObservationTask?.cancel()
+      self.pendingDevelopmentFingerprint = nil
+      self.developmentDiagnosis = nil
       self.restartPolling()
       self.restartMobileDashboard()
       await self.refresh()
@@ -321,6 +335,7 @@
           let observation = await service.readRuntimeStatus(configuration: configuration)
           if observation != self.snapshot.runtimeObservation {
             self.snapshot = self.snapshot.replacingRuntimeObservation(observation)
+            self.scheduleDevelopmentObservation(for: self.snapshot)
           }
         }
       }
@@ -344,6 +359,36 @@
           guard let self else { return }
           await self.refreshOxAudit()
           try? await Task.sleep(for: .seconds(1))
+        }
+      }
+    }
+
+    private func scheduleDevelopmentObservation(for snapshot: MomentMonitorSnapshot) {
+      let fingerprint = DevelopmentObservationPayload(snapshot: snapshot).fingerprint
+      if let diagnosis = self.developmentDiagnosis,
+        diagnosis.fingerprint == fingerprint,
+        diagnosis.source == .ollama || !self.localModelObserverEnabled
+      {
+        return
+      }
+      guard fingerprint != self.pendingDevelopmentFingerprint else { return }
+
+      self.developmentObservationTask?.cancel()
+      self.pendingDevelopmentFingerprint = fingerprint
+      let localModelEnabled = self.localModelObserverEnabled
+      self.developmentObservationTask = Task { [weak self] in
+        guard let self else { return }
+        let diagnosis = await self.developmentObserver.observe(
+          snapshot: snapshot,
+          localModelEnabled: localModelEnabled
+        )
+        guard !Task.isCancelled else { return }
+        let currentFingerprint = DevelopmentObservationPayload(snapshot: self.snapshot).fingerprint
+        if diagnosis.fingerprint == currentFingerprint {
+          self.developmentDiagnosis = diagnosis
+        }
+        if self.pendingDevelopmentFingerprint == fingerprint {
+          self.pendingDevelopmentFingerprint = nil
         }
       }
     }
