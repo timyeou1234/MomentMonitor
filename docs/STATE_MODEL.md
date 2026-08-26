@@ -12,6 +12,30 @@
 | Blocked | Open Issue + `dev-blocked` | Automation explicitly stopped this Issue. |
 | Completed | Merged automation PR + closed Issue | PR has `merged_at`, body/title resolves the originating Issue, and that Issue is closed. |
 
+Blocked presentation additionally distinguishes closed observer states without changing controller
+authority: `needs-owner-decision`／Owner marker becomes `owner decision`; a non-exhausted
+`auto-unblock-sol-high` becomes `auto recovery`; all other blocked work remains `blocked`.
+These values only guide the read-only Development observer and never dispatch or retry work.
+
+## Local development observer
+
+The observer derives one deterministic state from the already-reconciled snapshot:
+
+```text
+healthy | watch | blocked_technical | needs_owner | stale
+```
+
+and one recommendation:
+
+```text
+none | keep_watching | notify_owner | recommend_codex_diagnosis
+```
+
+`recommend_codex_diagnosis` is presentation text, not an action. Optional oMLX inference can
+rewrite only the bounded human summary; a classification/recommendation mismatch fails closed.
+The fingerprint excludes titles, details, URLs, timestamps and freeform activity so polling does
+not repeatedly invoke the model or expose private development content.
+
 ## M1 progress
 
 `M1 progress` 的 scope contract 是 GitHub Issue title 以 `[M1]` 開頭（大小寫不敏感）。分母是完整分頁結果中所有符合這個 marker 的非-PR Issues；分子是其中 GitHub state 為 `closed` 的 Issues。

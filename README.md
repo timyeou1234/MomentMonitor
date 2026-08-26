@@ -12,6 +12,7 @@
 - **Codex capacity**：透過官方 Codex App Server 唯讀取得目前 quota window 的剩餘百分比與重置時間；超過 3 分鐘未成功刷新即降為 Stale 並隱藏舊百分比，不以本機 token 紀錄估算，也不提供額度重置或購買操作。
 - **Ox Free sweep**：唯讀顯示隔離 Ox Issue audit 的 availability、目前 Issue、完成數、HTTP 狀態與下次重試；不讀取或顯示 token、prompt、response 或分類內容。
 - **Current automation**：精確顯示 Luna 開發、PR Fast、Sol review/repair、Luna verification、Sol High unblock、PR publication、exact-head verification、merge 與 Issue closure；包含模型角色、回合、Issue/PR identity、階段耗時、五段 lifecycle track，以及 Exec／App Server 發布的安全即時活動摘要（測試、build、repository 檢查、檔案變更、工具與最近事件）。
+- **Development observer**：先以 deterministic rules 區分 healthy、watch、technical block、Owner decision 與 stale state；可選擇把相同 closed enums 與 Issue/PR number 傳給本機 oMLX `Qwen3.5-0.8B-MLX-4bit`，產生一行繁中摘要。模型不能改變 rules 決策，也不能 dispatch Codex。
 - **Ready**：owner-authored Issue 具有 `dev-ready` 或 `moment:dev-ready` marker，且直接依賴都已關閉；排序與 scheduler 相同。
 - **Waiting on dependencies**：符合 ready 條件，但 `moment:depends-on` 仍有 open Issue。
 - **Runner queue**：若 repository 仍有可見的相關 GitHub Actions run，狀態為 `queued`、`waiting`、`pending` 或 `requested`。
@@ -51,6 +52,12 @@ account/rateLimits/read
 
 不會啟動 Codex thread/turn、讀取 token activity、消耗 reset credit 或變更帳號。
 
+啟用 Local development observer 時，只會向 `http://127.0.0.1:8011/v1/chat/completions`
+送出 bounded inference request。Payload 僅含 repository identity、closed lifecycle enums、
+Issue/PR number 與 bounded round counters；Issue body/title、comment、log、command、path、
+prompt、response、credential 與 checkpoint 都不會送出。Thinking 關閉，且 response
+必須回報 exact model identity；invalid output 只能退回 deterministic summary。
+
 沒有下列能力：
 
 ```text
@@ -79,6 +86,7 @@ repository sync
 - GitHub CLI：`brew install gh`
 - 已登入且可讀 private Moment repository：`gh auth login`
 - 選用的 Codex capacity 需要已登入 ChatGPT/Codex 的 Codex CLI；找不到或無法驗證時只顯示 Unavailable，不影響其他監控。
+- 選用的 Local Qwen summary 需要本機 oMLX 在 loopback `8011` 提供 `Qwen3.5-0.8B-MLX-4bit`；未安裝、未啟動、逾時、model identity 或 schema 不符時自動退回 rules-only，不影響監控。
 
 GUI app 從 Finder 啟動時 PATH 通常較短，因此程式會依序尋找：
 
@@ -152,7 +160,7 @@ swift test
 ## 維護方式
 
 - `main` 必須維持可建置、可安裝；功能與修正使用短期 branch 和 pull request。
-- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、73 項 deterministic tests、唯讀契約、app 打包與簽章驗證。
+- 每次 push 到 `main` 及每個 pull request 都會在 GitHub-hosted macOS runner 執行 warnings-as-errors、deterministic tests、唯讀契約、app 打包與簽章驗證。
 - CI 只使用 synthetic fixtures，不配置 Moment repository credential，也不執行 live refresh。
 - 發布版本使用 semantic version tag（例如 `v0.3.0`）；source 保持公開，但 Developer ID 與 notarization 完成前仍以本機 installer 安裝，不把 ad-hoc signed CI artifact 描述為可公開散佈的正式版本。
 - Moment repository 不保存此 app 的 source copy，也不把它設為 automation dependency。

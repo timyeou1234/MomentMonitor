@@ -64,6 +64,20 @@
           .foregroundStyle(.secondary)
         }
 
+        Section("Local development observer") {
+          Toggle(
+            "Use local Qwen summaries", isOn: self.$store.localModelObserverEnabled)
+          Label(
+            "Only closed status enums and Issue/PR numbers are sent to oMLX on this Mac.",
+            systemImage: "eye"
+          )
+          Text(
+            "Issue bodies, comments, logs, commands, paths, credentials, prompts, responses, and checkpoint contents are excluded. Rules remain authoritative; the model cannot dispatch Codex or change automation."
+          )
+          .font(.caption)
+          .foregroundStyle(.secondary)
+        }
+
         Section("Phone dashboard") {
           Toggle(
             "Serve a private dashboard from this Mac", isOn: self.$store.mobileDashboardEnabled)
@@ -136,7 +150,7 @@
         }
       }
       .formStyle(.grouped)
-      .frame(width: 540, height: 680)
+      .frame(width: 540, height: 760)
       .padding()
     }
   }
