@@ -6,16 +6,18 @@ cd "$root"
 
 forbidden='("POST"|"PATCH"|"PUT"|"DELETE"|--field|--raw-field|--input|"git"|/usr/bin/git|/opt/homebrew/bin/git|gh[[:space:]]+workflow[[:space:]]+run|gh[[:space:]]+run[[:space:]]+(rerun|cancel)|gh[[:space:]]+pr[[:space:]]+(merge|close|reopen|edit)|gh[[:space:]]+issue[[:space:]]+(edit|comment|close|reopen))'
 
-if grep -RInEi --include="*.swift" --exclude="OllamaDevelopmentObserverClient.swift" "$forbidden" Sources; then
+if grep -RInEi --include="*.swift" --exclude="OMLXDevelopmentObserverClient.swift" "$forbidden" Sources; then
   echo "Read-only contract violation found in production sources." >&2
   exit 1
 fi
 
-ollama_observer="Sources/MomentMonitorCore/OllamaDevelopmentObserverClient.swift"
-grep -q 'defaultEndpoint = URL(string: "http://127.0.0.1:11434")' "$ollama_observer"
-grep -q '\["127.0.0.1", "localhost", "::1"\].contains(host)' "$ollama_observer"
-grep -q 'request.httpMethod = "POST"' "$ollama_observer"
-if grep -nE 'https://|0\.0\.0\.0|GH_TOKEN|GITHUB_TOKEN|/api/(generate|embeddings|pull|push|create|copy|delete)' "$ollama_observer"; then
+omlx_observer="Sources/MomentMonitorCore/OMLXDevelopmentObserverClient.swift"
+grep -q 'defaultEndpoint = URL(string: "http://127.0.0.1:8011")' "$omlx_observer"
+grep -q 'defaultModel = "Qwen3.5-0.8B-MLX-4bit"' "$omlx_observer"
+grep -q '\["127.0.0.1", "localhost", "::1"\].contains(host)' "$omlx_observer"
+grep -q 'request.httpMethod = "POST"' "$omlx_observer"
+grep -q 'chatTemplateArguments: OMLXChatTemplateArguments(enableThinking: false)' "$omlx_observer"
+if grep -nE 'https://|0\.0\.0\.0|GH_TOKEN|GITHUB_TOKEN|/api/(generate|embeddings|pull|push|create|copy|delete)' "$omlx_observer"; then
   echo "Local model observer exceeds its loopback read-only inference boundary." >&2
   exit 1
 fi

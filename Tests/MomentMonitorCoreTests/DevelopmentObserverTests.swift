@@ -126,7 +126,7 @@ final class DevelopmentObserverTests: XCTestCase {
       at: self.now.addingTimeInterval(60)
     )
 
-    XCTAssertEqual(first.source, .ollama)
+    XCTAssertEqual(first.source, .omlx)
     XCTAssertEqual(first, second)
     let callCount = await model.callCount()
     XCTAssertEqual(callCount, 1)
@@ -150,30 +150,30 @@ final class DevelopmentObserverTests: XCTestCase {
 
   func testLoopbackEndpointValidationRejectsLANAndCredentials() {
     XCTAssertTrue(
-      OllamaDevelopmentObserverClient.isPermittedLoopbackEndpoint(
-        URL(string: "http://127.0.0.1:11434")!
+      OMLXDevelopmentObserverClient.isPermittedLoopbackEndpoint(
+        URL(string: "http://127.0.0.1:8011")!
       ))
     XCTAssertTrue(
-      OllamaDevelopmentObserverClient.isPermittedLoopbackEndpoint(
-        URL(string: "http://[::1]:11434/")!
+      OMLXDevelopmentObserverClient.isPermittedLoopbackEndpoint(
+        URL(string: "http://[::1]:8011/")!
       ))
     XCTAssertFalse(
-      OllamaDevelopmentObserverClient.isPermittedLoopbackEndpoint(
-        URL(string: "http://192.168.1.20:11434")!
+      OMLXDevelopmentObserverClient.isPermittedLoopbackEndpoint(
+        URL(string: "http://192.168.1.20:8011")!
       ))
     XCTAssertFalse(
-      OllamaDevelopmentObserverClient.isPermittedLoopbackEndpoint(
-        URL(string: "https://127.0.0.1:11434")!
+      OMLXDevelopmentObserverClient.isPermittedLoopbackEndpoint(
+        URL(string: "https://127.0.0.1:8011")!
       ))
     XCTAssertFalse(
-      OllamaDevelopmentObserverClient.isPermittedLoopbackEndpoint(
-        URL(string: "http://user:pass@127.0.0.1:11434")!
+      OMLXDevelopmentObserverClient.isPermittedLoopbackEndpoint(
+        URL(string: "http://user:pass@127.0.0.1:8011")!
       ))
   }
 
-  func testOllamaRequestDisablesThinkingAndRetainedSessionWithoutFreeformState() throws {
-    let client = try OllamaDevelopmentObserverClient(
-      endpoint: URL(string: "http://127.0.0.1:11434")!
+  func testOMLXRequestLocksModelDisablesThinkingAndExcludesFreeformState() throws {
+    let client = try OMLXDevelopmentObserverClient(
+      endpoint: URL(string: "http://127.0.0.1:8011")!
     )
     let assessment = DevelopmentObservationAssessment(
       snapshot: self.snapshot(
@@ -193,27 +193,40 @@ final class DevelopmentObserverTests: XCTestCase {
     let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
 
     XCTAssertEqual(request.httpMethod, "POST")
-    XCTAssertEqual(request.url?.absoluteString, "http://127.0.0.1:11434/api/chat")
-    XCTAssertEqual(json["model"] as? String, "qwen3.5:27b")
-    XCTAssertEqual(json["think"] as? Bool, false)
+    XCTAssertEqual(request.url?.absoluteString, "http://127.0.0.1:8011/v1/chat/completions")
+    XCTAssertEqual(json["model"] as? String, "Qwen3.5-0.8B-MLX-4bit")
     XCTAssertEqual(json["stream"] as? Bool, false)
-    XCTAssertEqual(json["keep_alive"] as? String, "0s")
+    XCTAssertEqual(json["max_tokens"] as? Int, 256)
+    XCTAssertEqual(json["temperature"] as? Int, 0)
+    XCTAssertEqual(
+      (json["response_format"] as? [String: Any])?["type"] as? String,
+      "json_object"
+    )
+    XCTAssertEqual(
+      (json["chat_template_kwargs"] as? [String: Any])?["enable_thinking"] as? Bool,
+      false
+    )
     XCTAssertFalse(String(decoding: body, as: UTF8.self).contains("SECRET"))
   }
 
-  func testStrictOllamaResponseAcceptsOnlyMatchingBoundedDecision() throws {
+  func testStrictOMLXResponseAcceptsOnlyExactModelAndMatchingBoundedDecision() throws {
     let assessment = DevelopmentObservationAssessment(
       snapshot: self.snapshot(items: [self.item(issueNumber: 436, statusText: "auto recovery")])
     )
     let content =
       #"{"classification":"blocked_technical","recommendation":"keep_watching","summary":"Issue #436 已由既有 Codex 恢復流程接手，持續觀察即可。"}"#
     let response = try JSONSerialization.data(withJSONObject: [
-      "message": ["role": "assistant", "content": content],
-      "done": true,
-      "done_reason": "stop",
+      "model": "Qwen3.5-0.8B-MLX-4bit",
+      "choices": [
+        [
+          "index": 0,
+          "message": ["role": "assistant", "content": content],
+          "finish_reason": "stop",
+        ]
+      ],
     ])
 
-    let decoded = try OllamaDevelopmentObserverClient.decodeResponse(
+    let decoded = try OMLXDevelopmentObserverClient.decodeResponse(
       response,
       assessment: assessment
     )
@@ -225,11 +238,34 @@ final class DevelopmentObserverTests: XCTestCase {
     let extraKeyContent =
       #"{"classification":"blocked_technical","recommendation":"keep_watching","summary":"watch","dispatch":true}"#
     let invalid = try JSONSerialization.data(withJSONObject: [
-      "message": ["role": "assistant", "content": extraKeyContent],
-      "done": true,
+      "model": "Qwen3.5-0.8B-MLX-4bit",
+      "choices": [
+        [
+          "index": 0,
+          "message": ["role": "assistant", "content": extraKeyContent],
+          "finish_reason": "stop",
+        ]
+      ],
     ])
     XCTAssertThrowsError(
-      try OllamaDevelopmentObserverClient.decodeResponse(invalid, assessment: assessment)
+      try OMLXDevelopmentObserverClient.decodeResponse(invalid, assessment: assessment)
+    )
+
+    let fallbackModel = try JSONSerialization.data(withJSONObject: [
+      "model": "Qwen3.5-27B-4bit",
+      "choices": [
+        [
+          "index": 0,
+          "message": ["role": "assistant", "content": content],
+          "finish_reason": "stop",
+        ]
+      ],
+    ])
+    XCTAssertThrowsError(
+      try OMLXDevelopmentObserverClient.decodeResponse(
+        fallbackModel,
+        assessment: assessment
+      )
     )
   }
 

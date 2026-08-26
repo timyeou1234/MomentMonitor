@@ -41,12 +41,12 @@ Development observer 的 classification 與 recommendation 完全由 app 內 det
 rules 決定。若 Settings 開啟 Local Qwen summary，App 只允許：
 
 ```text
-POST http://127.0.0.1:11434/api/chat
+POST http://127.0.0.1:8011/v1/chat/completions
 ```
 
 等價的 `localhost`／`::1` endpoint 只供測試與明確 local configuration；HTTPS、LAN、
 credential-bearing URL、query、fragment 與其他 API path 都被拒絕。Request 強制
-`stream=false`、`think=false`、`keep_alive=0s`、bounded context/output；response 有
+`stream=false`、`chat_template_kwargs.enable_thinking=false`、exact model identity 與 bounded output；response 有
 64 KiB 外層與 2 KiB model JSON 上限。
 
 模型輸入是獨立 allow-list：repository identity、runtime availability/phase/outcome/model/role、
@@ -130,7 +130,7 @@ Tailscale Funnel、public tunnel 或公開 hosting。
 ## Forbidden behavior
 
 - 對 GitHub 或 mobile dashboard 使用非 GET/HEAD HTTP method；
-- 對 loopback Ollama `/api/chat` 以外的 inference 或 management endpoint 發 request；
+- 對 loopback oMLX `/v1/chat/completions` 以外的 inference 或 management endpoint 發 request；
 - `gh workflow run`；
 - `gh run rerun` / `gh run cancel`；
 - `gh issue edit/comment/close/reopen`；
@@ -153,5 +153,5 @@ Tailscale Funnel、public tunnel 或公開 hosting。
 - UI exposes only refresh, open URL, copy a Tailscale Serve command, settings and quit。
 - Temporary GitHub response files use a random `0700` directory and `0600` files, then are removed immediately after each command。
 - Codex App Server request construction is tested as an exact three-message allow-list；temporary stdio files use the same `0700`/`0600` pattern and are removed immediately。
-- Ollama request construction tests enforce loopback-only URL、closed payload、thinking/session disable、strict response keys/bounds，以及 model 不得改變 deterministic recommendation。
+- oMLX request construction tests enforce loopback-only URL、exact model identity、closed payload、thinking disable、strict response keys/bounds，以及 model 不得改變 deterministic recommendation。
 - `MobileDashboardTests` exercise the real loopback listener, security headers, method allow-list, untrusted Host rejection and sanitized schema；source scans reject public binding, CORS and browser persistence。

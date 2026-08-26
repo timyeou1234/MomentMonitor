@@ -6,9 +6,9 @@ Validated on macOS / Apple Silicon with 84 XCTest cases and 0 failures:
 
 - deterministic classification distinguishes healthy, watch, technical block, Owner decision and stale state;
 - `dev-blocked + auto-unblock-sol-high` is presented as an existing authoritative recovery route rather than a second dispatch request;
-- Ollama input contains only repository identity, closed status enums, Issue/PR numbers and bounded counters; titles, bodies, comments, logs, commands, paths, timestamps, credentials and checkpoint data are excluded;
+- oMLX input contains only repository identity, closed status enums, Issue/PR numbers and bounded counters; titles, bodies, comments, logs, commands, paths, timestamps, credentials and checkpoint data are excluded;
 - observation fingerprints ignore freeform presentation and polling timestamps, so unchanged state does not repeat inference;
-- only loopback HTTP is accepted, with thinking and retained model sessions disabled;
+- only loopback HTTP is accepted, with exact model identity and thinking disabled;
 - strict response keys, size, classification and recommendation matching prevent the model from escalating deterministic advice;
 - invalid, unavailable, slow or policy-mismatched local inference falls back to rules-only presentation;
 - the Monitor remains unable to dispatch Codex, mutate GitHub, touch Moment state, or become controller input.

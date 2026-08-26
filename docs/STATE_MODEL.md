@@ -31,7 +31,7 @@ and one recommendation:
 none | keep_watching | notify_owner | recommend_codex_diagnosis
 ```
 
-`recommend_codex_diagnosis` is presentation text, not an action. Optional Ollama inference can
+`recommend_codex_diagnosis` is presentation text, not an action. Optional oMLX inference can
 rewrite only the bounded human summary; a classification/recommendation mismatch fails closed.
 The fingerprint excludes titles, details, URLs, timestamps and freeform activity so polling does
 not repeatedly invoke the model or expose private development content.

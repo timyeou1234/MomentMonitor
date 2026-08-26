@@ -68,7 +68,7 @@
           Toggle(
             "Use local Qwen summaries", isOn: self.$store.localModelObserverEnabled)
           Label(
-            "Only closed status enums and Issue/PR numbers are sent to Ollama on this Mac.",
+            "Only closed status enums and Issue/PR numbers are sent to oMLX on this Mac.",
             systemImage: "eye"
           )
           Text(

@@ -13,7 +13,7 @@
           Text("Development observer")
             .font(.caption.weight(.semibold))
           Spacer(minLength: 4)
-          Text(self.diagnosis.source == .ollama ? "LOCAL AI" : "RULES")
+          Text(self.diagnosis.source == .omlx ? "LOCAL AI" : "RULES")
             .font(.system(size: 8, weight: .bold, design: .rounded))
             .foregroundStyle(self.accentColor)
             .padding(.horizontal, 5)

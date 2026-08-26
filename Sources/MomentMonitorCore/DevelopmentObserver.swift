@@ -37,7 +37,7 @@ public enum DevelopmentObservationRecommendation: String, Codable, CaseIterable,
 
 public enum DevelopmentDiagnosisSource: String, Codable, Sendable {
   case deterministic
-  case ollama
+  case omlx
 }
 
 public struct DevelopmentDiagnosis: Codable, Equatable, Sendable {
@@ -319,7 +319,7 @@ public actor DevelopmentObserver {
   }
 
   public static func live() -> DevelopmentObserver {
-    DevelopmentObserver(modelClient: try? OllamaDevelopmentObserverClient.live())
+    DevelopmentObserver(modelClient: try? OMLXDevelopmentObserverClient.live())
   }
 
   public func observe(
@@ -333,7 +333,7 @@ public actor DevelopmentObserver {
     if let cache, cache.fingerprint == fingerprint,
       cache.localModelEnabled == localModelEnabled
     {
-      if cache.diagnosis.source == .ollama
+      if cache.diagnosis.source == .omlx
         || !localModelEnabled
         || date.timeIntervalSince(cache.attemptedAt) < self.retryInterval
       {
@@ -364,7 +364,7 @@ public actor DevelopmentObserver {
         recommendation: assessment.recommendation,
         issueNumber: assessment.issueNumber,
         summary: modelResult.summary,
-        source: .ollama,
+        source: .omlx,
         generatedAt: date
       )
     } catch is CancellationError {

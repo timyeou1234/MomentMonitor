@@ -36,9 +36,9 @@ public struct URLSessionDevelopmentObserverTransport: DevelopmentObserverHTTPTra
   }
 }
 
-public struct OllamaDevelopmentObserverClient: DevelopmentObserverModelCalling, Sendable {
-  public static let defaultEndpoint = URL(string: "http://127.0.0.1:11434")!
-  public static let defaultModel = "qwen3.5:27b"
+public struct OMLXDevelopmentObserverClient: DevelopmentObserverModelCalling, Sendable {
+  public static let defaultEndpoint = URL(string: "http://127.0.0.1:8011")!
+  public static let defaultModel = "Qwen3.5-0.8B-MLX-4bit"
   public static let maximumResponseBytes = 65_536
   public static let maximumSummaryCharacters = 240
 
@@ -72,31 +72,38 @@ public struct OllamaDevelopmentObserverClient: DevelopmentObserverModelCalling, 
       throw DevelopmentObserverError.responseTooLarge
     }
     guard response.statusCode == 200 else { throw DevelopmentObserverError.unavailable }
-    return try Self.decodeResponse(data, assessment: assessment)
+    return try Self.decodeResponse(
+      data,
+      assessment: assessment,
+      expectedModel: self.model
+    )
   }
 
   public func makeRequest(assessment: DevelopmentObservationAssessment) throws -> URLRequest {
-    let apiURL = self.endpoint.appending(path: "api/chat")
+    let apiURL = self.endpoint
+      .appending(path: "v1")
+      .appending(path: "chat")
+      .appending(path: "completions")
     var request = URLRequest(url: apiURL)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
     request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
     request.httpBody = try JSONEncoder.observerEncoder.encode(
-      OllamaRequest(
+      OMLXRequest(
         model: self.model,
         messages: [
-          OllamaMessage(role: "system", content: Self.systemPrompt),
-          OllamaMessage(
+          OMLXMessage(role: "system", content: Self.systemPrompt),
+          OMLXMessage(
             role: "user",
             content: try Self.userPrompt(assessment: assessment)
           ),
         ],
         stream: false,
-        think: false,
-        format: "json",
-        keepAlive: "0s",
-        options: OllamaOptions(temperature: 0, numContext: 8_192, numPredict: 256)
+        maximumTokens: 256,
+        temperature: 0,
+        responseFormat: OMLXResponseFormat(type: "json_object"),
+        chatTemplateArguments: OMLXChatTemplateArguments(enableThinking: false)
       )
     )
     return request
@@ -117,26 +124,30 @@ public struct OllamaDevelopmentObserverClient: DevelopmentObserverModelCalling, 
 
   public static func decodeResponse(
     _ data: Data,
-    assessment: DevelopmentObservationAssessment
+    assessment: DevelopmentObservationAssessment,
+    expectedModel: String = Self.defaultModel
   ) throws -> DevelopmentModelDiagnosis {
-    let response: OllamaResponse
+    let response: OMLXResponse
     do {
-      response = try JSONDecoder.observerDecoder.decode(OllamaResponse.self, from: data)
+      response = try JSONDecoder.observerDecoder.decode(OMLXResponse.self, from: data)
     } catch {
       throw DevelopmentObserverError.invalidResponse
     }
-    guard response.done == true,
-      response.doneReason == nil || response.doneReason == "stop",
-      response.message.role == "assistant",
-      let contentData = response.message.content.data(using: .utf8),
+    guard response.model == expectedModel,
+      response.choices.count == 1,
+      let choice = response.choices.first,
+      choice.index == 0,
+      choice.finishReason == "stop",
+      choice.message.role == "assistant",
+      let contentData = choice.message.content.data(using: .utf8),
       contentData.count <= 2_048,
       let object = try? JSONSerialization.jsonObject(with: contentData) as? [String: Any],
       Set(object.keys) == ["classification", "recommendation", "summary"]
     else { throw DevelopmentObserverError.invalidResponse }
 
-    let result: OllamaModelResult
+    let result: OMLXModelResult
     do {
-      result = try JSONDecoder().decode(OllamaModelResult.self, from: contentData)
+      result = try JSONDecoder().decode(OMLXModelResult.self, from: contentData)
     } catch {
       throw DevelopmentObserverError.invalidResponse
     }
@@ -164,7 +175,7 @@ public struct OllamaDevelopmentObserverClient: DevelopmentObserverModelCalling, 
   }
 
   private static func userPrompt(assessment: DevelopmentObservationAssessment) throws -> String {
-    let envelope = OllamaPromptEnvelope(
+    let envelope = OMLXPromptEnvelope(
       deterministicClassification: assessment.classification,
       deterministicRecommendation: assessment.recommendation,
       focusIssueNumber: assessment.issueNumber,
@@ -184,7 +195,7 @@ public struct OllamaDevelopmentObserverClient: DevelopmentObserverModelCalling, 
     """
 }
 
-private struct OllamaPromptEnvelope: Codable, Sendable {
+private struct OMLXPromptEnvelope: Codable, Sendable {
   let deterministicClassification: DevelopmentObservationClassification
   let deterministicRecommendation: DevelopmentObservationRecommendation
   let focusIssueNumber: Int?
@@ -198,50 +209,57 @@ private struct OllamaPromptEnvelope: Codable, Sendable {
   }
 }
 
-private struct OllamaRequest: Codable, Sendable {
+private struct OMLXRequest: Codable, Sendable {
   let model: String
-  let messages: [OllamaMessage]
+  let messages: [OMLXMessage]
   let stream: Bool
-  let think: Bool
-  let format: String
-  let keepAlive: String
-  let options: OllamaOptions
-
-  private enum CodingKeys: String, CodingKey {
-    case model, messages, stream, think, format, options
-    case keepAlive = "keep_alive"
-  }
-}
-
-private struct OllamaOptions: Codable, Sendable {
+  let maximumTokens: Int
   let temperature: Int
-  let numContext: Int
-  let numPredict: Int
+  let responseFormat: OMLXResponseFormat
+  let chatTemplateArguments: OMLXChatTemplateArguments
 
   private enum CodingKeys: String, CodingKey {
-    case temperature
-    case numContext = "num_ctx"
-    case numPredict = "num_predict"
+    case model, messages, stream, temperature
+    case maximumTokens = "max_tokens"
+    case responseFormat = "response_format"
+    case chatTemplateArguments = "chat_template_kwargs"
   }
 }
 
-private struct OllamaMessage: Codable, Sendable {
+private struct OMLXResponseFormat: Codable, Sendable {
+  let type: String
+}
+
+private struct OMLXChatTemplateArguments: Codable, Sendable {
+  let enableThinking: Bool
+
+  private enum CodingKeys: String, CodingKey {
+    case enableThinking = "enable_thinking"
+  }
+}
+
+private struct OMLXMessage: Codable, Sendable {
   let role: String
   let content: String
 }
 
-private struct OllamaResponse: Codable, Sendable {
-  let message: OllamaMessage
-  let done: Bool?
-  let doneReason: String?
+private struct OMLXResponse: Codable, Sendable {
+  let model: String
+  let choices: [OMLXChoice]
+}
+
+private struct OMLXChoice: Codable, Sendable {
+  let index: Int
+  let message: OMLXMessage
+  let finishReason: String
 
   private enum CodingKeys: String, CodingKey {
-    case message, done
-    case doneReason = "done_reason"
+    case index, message
+    case finishReason = "finish_reason"
   }
 }
 
-private struct OllamaModelResult: Codable, Sendable {
+private struct OMLXModelResult: Codable, Sendable {
   let classification: DevelopmentObservationClassification
   let recommendation: DevelopmentObservationRecommendation
   let summary: String

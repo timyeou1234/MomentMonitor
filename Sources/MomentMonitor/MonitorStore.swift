@@ -367,7 +367,7 @@
       let fingerprint = DevelopmentObservationPayload(snapshot: snapshot).fingerprint
       if let diagnosis = self.developmentDiagnosis,
         diagnosis.fingerprint == fingerprint,
-        diagnosis.source == .ollama || !self.localModelObserverEnabled
+        diagnosis.source == .omlx || !self.localModelObserverEnabled
       {
         return
       }
