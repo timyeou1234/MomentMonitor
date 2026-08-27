@@ -33,6 +33,10 @@
           OxAuditView(observation: self.store.oxAudit)
           Divider()
         }
+        if let current = self.store.snapshot.rolloverCurrentAutomationItem {
+          RolloverCurrentAutomationView(item: current)
+          Divider()
+        }
         if self.store.snapshot.runtimeObservation.availability != .absent {
           AutomationRuntimeView(observation: self.store.snapshot.runtimeObservation)
           Divider()
@@ -71,7 +75,9 @@
         }
         .frame(
           width: 440,
-          height: self.store.snapshot.runtimeObservation.availability == .absent ? 520 : 390
+          height: self.store.snapshot.rolloverCurrentAutomationItem == nil
+            ? (self.store.snapshot.runtimeObservation.availability == .absent ? 520 : 390)
+            : 430
         )
 
         Divider()

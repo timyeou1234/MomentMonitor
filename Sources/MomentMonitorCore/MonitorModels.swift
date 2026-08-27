@@ -211,6 +211,19 @@ public struct MomentMonitorSnapshot: Codable, Equatable, Sendable {
   public var activeCount: Int {
     self.items.filter { [.queued, .running, .prChecks].contains($0.lane) }.count
   }
+
+  /// A GitHub-running Issue that began after a different controller runtime
+  /// reached a terminal state. This never copies terminal runtime details onto
+  /// the new Issue; it only selects the truthful current presentation.
+  public var rolloverCurrentAutomationItem: MonitorItem? {
+    guard self.runtimeObservation.availability == .terminal else { return nil }
+    let terminalIssue =
+      self.runtimeObservation.autonomousStatus?.issueNumber
+      ?? self.runtimeObservation.status?.issueNumber
+    return self.items.first {
+      $0.lane == .running && $0.issueNumber != terminalIssue
+    }
+  }
 }
 
 public struct MonitorConfiguration: Codable, Equatable, Sendable {

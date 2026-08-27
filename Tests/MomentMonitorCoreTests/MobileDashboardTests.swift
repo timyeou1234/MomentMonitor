@@ -158,6 +158,10 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("poll({ manual: true })"))
     XCTAssertTrue(javascript.contains("const stageOrder = [0, 1, 2, 3, 4]"))
     XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 6"))
+    XCTAssertTrue(javascript.contains("rolloverCurrent"))
+    XCTAssertTrue(
+      javascript.contains("GitHub running · exact matching ProductDev runtime details unavailable"))
+    XCTAssertTrue(javascript.contains("Last controller outcome remains Issue #"))
     XCTAssertTrue(javascript.contains("elapsedMilliseconds"))
     XCTAssertTrue(javascript.contains("Codex —"))
     XCTAssertTrue(javascript.contains("textContent"))
