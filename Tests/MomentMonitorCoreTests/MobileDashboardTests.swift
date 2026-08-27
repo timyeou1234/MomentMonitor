@@ -92,7 +92,7 @@ final class MobileDashboardTests: XCTestCase {
     let decoded = try JSONDecoder.mobileDashboard.decode(MobileDashboardEnvelope.self, from: data)
     let rendered = String(decoding: data, as: UTF8.self)
 
-    XCTAssertEqual(decoded.schemaVersion, 5)
+    XCTAssertEqual(decoded.schemaVersion, 6)
     XCTAssertEqual(decoded.repository, "timyeou1234/Moment")
     XCTAssertEqual(decoded.runtime.phase, .solReview)
     XCTAssertEqual(decoded.runtime.activeStage, .review)
@@ -157,7 +157,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("latestDataUpdate"))
     XCTAssertTrue(javascript.contains("poll({ manual: true })"))
     XCTAssertTrue(javascript.contains("const stageOrder = [0, 1, 2, 3, 4]"))
-    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 5"))
+    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 6"))
     XCTAssertTrue(javascript.contains("elapsedMilliseconds"))
     XCTAssertTrue(javascript.contains("Codex —"))
     XCTAssertTrue(javascript.contains("textContent"))

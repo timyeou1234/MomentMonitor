@@ -50,10 +50,9 @@ public struct MomentStateBuilder: Sendable {
       })
     let activeIssueNumbersFromPullRequestRuns = Set(
       activePullRequestNumbers.compactMap { issueNumberByPullRequest[$0] })
-    let runtimeIssueNumber = reconciledRuntimeObservation.status.flatMap { status in
+    let runtimeIssueNumber =
       [.live, .stale].contains(reconciledRuntimeObservation.availability)
-        ? status.issueNumber : nil
-    }
+      ? reconciledRuntimeObservation.issueNumber : nil
     let activeRunsForDisplay = activeRuns.filter { run in
       guard let runtimeIssueNumber else { return true }
       let directIssue = RunCorrelation.issueNumber(from: run)
@@ -172,8 +171,40 @@ public struct MomentStateBuilder: Sendable {
     issueByNumber: [Int: GitHubIssue],
     pullRequestByNumber: [Int: GitHubPullRequest]
   ) -> MonitorItem? {
-    guard [.live, .stale].contains(observation.availability),
-      let status = observation.status,
+    guard [.live, .stale].contains(observation.availability) else { return nil }
+
+    if let status = observation.autonomousStatus,
+      let issueNumber = status.issueNumber,
+      let issue = issueByNumber[issueNumber]
+    {
+      var detailParts = [status.phase.title]
+      if status.reviewRound > 0 { detailParts.append("review round \(status.reviewRound)") }
+      if status.repairAttempt > 0 {
+        detailParts.append("repair attempt \(status.repairAttempt)")
+      }
+      if observation.availability == .live {
+        detailParts.append(
+          "phase observed \(RelativeTimeFormatter.relativeDescription(from: status.observedAt, to: self.now))"
+        )
+      } else if let message = observation.message {
+        detailParts.append(message)
+      }
+      return MonitorItem(
+        id: "running:productdev-runtime:\(issueNumber)",
+        lane: .running,
+        source: .inferredState,
+        title: "#\(issueNumber) \(issue.title)",
+        detail: detailParts.joined(separator: " · "),
+        statusText: status.role.rawValue,
+        issueNumber: issueNumber,
+        url: issue.htmlUrl,
+        updatedAt: status.observedAt,
+        severity: observation.availability == .live ? .active : .warning,
+        sequenceNumber: issueNumber
+      )
+    }
+
+    guard let status = observation.status,
       let issue = issueByNumber[status.issueNumber]
     else { return nil }
 
@@ -340,9 +371,9 @@ public struct MomentStateBuilder: Sendable {
     activeIssueNumbers: Set<Int>,
     runtimeObservation: AutomationRuntimeObservation
   ) -> [MonitorItem] {
-    let runtimeIssueNumber = runtimeObservation.status.flatMap { status in
-      [.live, .stale].contains(runtimeObservation.availability) ? status.issueNumber : nil
-    }
+    let runtimeIssueNumber =
+      [.live, .stale].contains(runtimeObservation.availability)
+      ? runtimeObservation.issueNumber : nil
     return issues.compactMap { issue -> MonitorItem? in
       guard issue.isOpen,
         issue.labelNames.contains("dev-running"),
@@ -372,6 +403,17 @@ public struct MomentStateBuilder: Sendable {
     issueByNumber: [Int: GitHubIssue],
     pullRequestByNumber: [Int: GitHubPullRequest]
   ) -> AutomationRuntimeObservation {
+    if let status = observation.autonomousStatus {
+      guard let issueNumber = status.issueNumber,
+        issueByNumber[issueNumber] != nil
+      else {
+        return .autonomousStale(
+          status,
+          message: "The originating Issue is not visible on GitHub."
+        )
+      }
+      return observation
+    }
     guard let status = observation.status else { return observation }
     guard let issue = issueByNumber[status.issueNumber] else {
       return .stale(status, message: "The originating Issue is not visible on GitHub.")
