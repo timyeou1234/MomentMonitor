@@ -112,10 +112,12 @@ public struct DevelopmentObservedRuntime: Codable, Equatable, Sendable {
   public let roundNumber: Int?
   public let totalRounds: Int?
   public let repairAttempt: Int?
+  public let autonomousPhase: ProductDevAutonomousRuntimePhase?
+  public let autonomousRole: ProductDevAutonomousRuntimeRole?
 
   public init(observation: AutomationRuntimeObservation) {
     self.availability = observation.availability
-    self.issueNumber = observation.status?.issueNumber
+    self.issueNumber = observation.issueNumber
     self.pullRequestNumber = observation.status?.pullRequestNumber
     self.phase = observation.status?.phase
     self.outcome = observation.status?.outcome
@@ -124,6 +126,8 @@ public struct DevelopmentObservedRuntime: Codable, Equatable, Sendable {
     self.roundNumber = observation.status?.roundNumber
     self.totalRounds = observation.status?.totalRounds
     self.repairAttempt = observation.status?.repairAttempt
+    self.autonomousPhase = observation.autonomousStatus?.phase
+    self.autonomousRole = observation.autonomousStatus?.role
   }
 }
 

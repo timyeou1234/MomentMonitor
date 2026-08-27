@@ -15,7 +15,7 @@ public struct MomentMonitorService: Sendable {
   public static func live() throws -> Self {
     Self(
       reader: try GitHubCLIClient.live(),
-      runtimeReader: AutomationRuntimeStatusReader.live()
+      runtimeReader: ProductDevCutoverRuntimeStatusReader.live()
     )
   }
 

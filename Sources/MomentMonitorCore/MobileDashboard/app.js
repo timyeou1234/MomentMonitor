@@ -136,7 +136,10 @@ function renderStages(activeStage, completed) {
 function runtimeBadge(runtime) {
   switch (runtime.availability) {
     case "live": return ["LIVE", "status-live"];
-    case "terminal": return [(runtime.outcome || "terminal").toUpperCase(), runtime.outcome === "completed" ? "status-success" : "status-warning"];
+    case "terminal": {
+      const outcome = runtime.outcome || runtime.autonomousPhase || "terminal";
+      return [outcome.toUpperCase(), outcome === "completed" ? "status-success" : "status-warning"];
+    }
     case "stale": return ["STALE", "status-warning"];
     case "invalid": return ["INVALID", "status-danger"];
     default: return ["IDLE", "status-idle"];
@@ -238,10 +241,11 @@ function renderRuntime(runtime, now) {
 
   const detail = [];
   if (runtime.model) detail.push(runtime.model === "gpt-5.6-luna" ? "Luna" : "Sol");
-  if (runtime.role) detail.push(runtime.role);
+  if (runtime.role || runtime.autonomousRole) detail.push(runtime.role || runtime.autonomousRole);
   if (runtime.roundNumber && runtime.totalRounds) detail.push(`round ${runtime.roundNumber} of ${runtime.totalRounds}`);
+  else if (runtime.source === "productdev" && runtime.roundNumber) detail.push(`review round ${runtime.roundNumber}`);
   if (runtime.repairAttempt) detail.push(`repair ${runtime.repairAttempt}`);
-  setText("runtime-detail", detail.length ? detail.join(" · ") : "Controller-reported phase; GitHub remains authoritative for completion.");
+  setText("runtime-detail", detail.length ? detail.join(" · ") : "Runtime phase only; GitHub remains authoritative for completion.");
 
   setText("runtime-issue", runtime.issueNumber ? `Issue #${runtime.issueNumber}` : "Issue —");
   setText(
@@ -250,13 +254,23 @@ function renderRuntime(runtime, now) {
       ? "Codex time not recorded"
       : `Codex ${elapsedMilliseconds(runtime.issueDurationMilliseconds)}`
   );
-  setText("runtime-pr", runtime.pullRequestNumber ? `PR #${runtime.pullRequestNumber}` : "PR not created yet");
-  setText("runtime-time", runtime.availability === "live" ? `${duration(runtime.phaseStartedAt, now)} in phase` : relativeTime(runtime.updatedAt, now));
+  setText(
+    "runtime-pr",
+    runtime.pullRequestNumber
+      ? `PR #${runtime.pullRequestNumber}`
+      : runtime.source === "productdev" ? "PR not reported" : "PR not created yet"
+  );
+  setText(
+    "runtime-time",
+    runtime.availability === "live" && runtime.phaseStartedAt
+      ? `${duration(runtime.phaseStartedAt, now)} in phase`
+      : relativeTime(runtime.updatedAt, now)
+  );
 
   const message = byID("runtime-message");
   message.hidden = !runtime.message;
   message.textContent = runtime.message || "";
-  renderStages(runtime.activeStage, runtime.outcome === "completed");
+  renderStages(runtime.activeStage, runtime.outcome === "completed" || runtime.autonomousPhase === "completed");
   renderStrategy(runtime.strategy);
   renderActivity(runtime.activity, now, runtime.availability === "live");
 }
@@ -479,7 +493,7 @@ async function poll({ manual = false } = {}) {
     const response = await fetch("/api/v1/snapshot", { cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error(`Snapshot request failed: ${response.status}`);
     const snapshot = await response.json();
-    if (snapshot.schemaVersion !== 5) throw new Error("Unsupported snapshot schema");
+    if (snapshot.schemaVersion !== 6) throw new Error("Unsupported snapshot schema");
     state.snapshot = snapshot;
     state.connected = true;
     state.lastSuccess = new Date(snapshot.servedAt);

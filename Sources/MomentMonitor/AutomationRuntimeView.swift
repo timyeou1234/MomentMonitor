@@ -64,6 +64,48 @@
             }
             .font(.caption2.monospacedDigit())
             .foregroundStyle(.secondary)
+          } else if let status = self.observation.autonomousStatus {
+            HStack(alignment: .firstTextBaseline, spacing: 7) {
+              Image(systemName: self.symbolName)
+                .foregroundStyle(self.accentColor)
+              Text(status.phase.title)
+                .font(.callout.weight(.semibold))
+              Spacer(minLength: 4)
+              Text(
+                RelativeTimeFormatter.relativeDescription(from: status.observedAt, to: context.date)
+              )
+              .font(.caption2.monospacedDigit())
+              .foregroundStyle(.tertiary)
+            }
+
+            HStack(spacing: 4) {
+              ForEach(AutomationRuntimeStage.allCases, id: \.self) { stage in
+                let reached = stage.rawValue <= status.phase.stage.rawValue
+                let isCurrent = stage == status.phase.stage && !status.phase.isTerminal
+                Text(stage.title)
+                  .font(.system(size: 7, weight: .bold, design: .rounded))
+                  .foregroundStyle(
+                    isCurrent ? Color.white : reached ? self.accentColor : .secondary
+                  )
+                  .frame(maxWidth: .infinity)
+                  .padding(.vertical, 3)
+                  .background(
+                    isCurrent
+                      ? self.accentColor
+                      : reached ? self.accentColor.opacity(0.14) : Color.secondary.opacity(0.08),
+                    in: Capsule()
+                  )
+              }
+            }
+
+            HStack(spacing: 7) {
+              if let issueNumber = status.issueNumber { Text("Issue #\(issueNumber)") }
+              Text(status.role.rawValue.capitalized)
+              if status.reviewRound > 0 { Text("Review \(status.reviewRound)") }
+              if status.repairAttempt > 0 { Text("Repair \(status.repairAttempt)") }
+            }
+            .font(.caption2.monospacedDigit())
+            .foregroundStyle(.secondary)
           }
 
           if let message = self.observation.message {
@@ -230,7 +272,10 @@
     private var badgeText: String {
       switch self.observation.availability {
       case .live: "LIVE"
-      case .terminal: self.observation.status?.outcome.rawValue.uppercased() ?? "TERMINAL"
+      case .terminal:
+        self.observation.status?.outcome.rawValue.uppercased()
+          ?? self.observation.autonomousStatus?.phase.rawValue.uppercased()
+          ?? "TERMINAL"
       case .stale: "STALE"
       case .invalid: "INVALID"
       case .absent: "OFF"
@@ -241,7 +286,8 @@
       switch self.observation.availability {
       case .live: .blue
       case .terminal:
-        self.observation.status?.outcome == .completed ? .green : .orange
+        self.observation.status?.outcome == .completed
+          || self.observation.autonomousStatus?.phase == .completed ? .green : .orange
       case .stale: .orange
       case .invalid: .red
       case .absent: .secondary
@@ -253,6 +299,7 @@
       case .live: "waveform.path.ecg"
       case .terminal:
         self.observation.status?.outcome == .completed
+          || self.observation.autonomousStatus?.phase == .completed
           ? "checkmark.circle.fill" : "stop.circle.fill"
       case .stale: "exclamationmark.arrow.triangle.2.circlepath"
       case .invalid: "xmark.shield.fill"
@@ -283,6 +330,20 @@
     }
 
     private func accessibilityValue(now: Date) -> String {
+      if let status = self.observation.autonomousStatus {
+        var parts = [
+          self.badgeText,
+          status.phase.title,
+          "lifecycle \(status.phase.stage.title)",
+          status.issueNumber.map { "Issue \($0)" } ?? "Issue unavailable",
+          status.role.rawValue,
+          RelativeTimeFormatter.relativeDescription(from: status.observedAt, to: now),
+        ]
+        if status.reviewRound > 0 { parts.append("review round \(status.reviewRound)") }
+        if status.repairAttempt > 0 { parts.append("repair attempt \(status.repairAttempt)") }
+        if let message = self.observation.message { parts.append(message) }
+        return parts.joined(separator: ", ")
+      }
       guard let status = self.observation.status else {
         return self.observation.message ?? "No local runtime status"
       }

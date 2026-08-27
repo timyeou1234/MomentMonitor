@@ -1,7 +1,7 @@
 import Foundation
 
 public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
-  public static let schemaVersion = 5
+  public static let schemaVersion = 6
 
   public let schemaVersion: Int
   public let repository: String
@@ -114,37 +114,48 @@ public struct MobileRuntimeSummary: Codable, Equatable, Sendable {
   public let phaseStartedAt: Date?
   public let updatedAt: Date?
   public let issueDurationMilliseconds: Int64?
+  public let source: String
+  public let autonomousPhase: ProductDevAutonomousRuntimePhase?
+  public let autonomousRole: ProductDevAutonomousRuntimeRole?
 
   public init(observation: AutomationRuntimeObservation, now: Date = Date()) {
     let status = observation.status
+    let autonomous = observation.autonomousStatus
     let effectivePhase = status?.lastActivePhase ?? status?.phase
     self.availability = observation.availability
     self.message = observation.message
     self.phase = status?.phase
-    self.phaseTitle = status?.phase.title
-    self.activeStage = effectivePhase?.stage
+    self.phaseTitle = autonomous?.phase.title ?? status?.phase.title
+    self.activeStage = autonomous?.phase.stage ?? effectivePhase?.stage
     self.lastActivePhase = status?.lastActivePhase
     self.lastActivePhaseTitle = status?.lastActivePhase?.title
     self.outcome = status?.outcome
     self.model = status?.model
     self.role = status?.role
-    self.issueNumber = status?.issueNumber
+    self.issueNumber = autonomous?.issueNumber ?? status?.issueNumber
     self.pullRequestNumber = status?.pullRequestNumber
-    self.roundNumber = status?.roundNumber
+    self.roundNumber =
+      autonomous.flatMap { $0.reviewRound > 0 ? $0.reviewRound : nil }
+      ?? status?.roundNumber
     self.totalRounds = status?.totalRounds
-    self.repairAttempt = status?.repairAttempt
+    self.repairAttempt =
+      autonomous.flatMap { $0.repairAttempt > 0 ? $0.repairAttempt : nil }
+      ?? status?.repairAttempt
     self.strategy = AutomationStrategyProgress(observation: observation)
     self.activity =
       observation.availability == .live
         && status?.activity?.isRecent(at: now) == true ? status?.activity : nil
     self.startedAt = status?.startedAt
     self.phaseStartedAt = status?.phaseStartedAt
-    self.updatedAt = status?.updatedAt
+    self.updatedAt = autonomous?.observedAt ?? status?.updatedAt
     self.issueDurationMilliseconds = status?.observedDurationMilliseconds(
       for: status?.issueNumber ?? 0,
       at: now,
       runnerIsLive: observation.availability == .live
     )
+    self.source = autonomous == nil ? "moment" : "productdev"
+    self.autonomousPhase = autonomous?.phase
+    self.autonomousRole = autonomous?.role
   }
 }
 

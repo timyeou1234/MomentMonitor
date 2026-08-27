@@ -448,18 +448,125 @@ public enum AutomationRuntimeAvailability: String, Codable, Sendable {
   case invalid
 }
 
+public enum ProductDevAutonomousRuntimePhase: String, Codable, CaseIterable, Sendable {
+  case admitting
+  case prepared
+  case implementing
+  case repairing
+  case candidateFailed = "candidate_failed"
+  case checked
+  case reviewing
+  case changesRequested = "changes_requested"
+  case finalGoalPending = "final_goal_pending"
+  case reviewed
+  case publishing
+  case completed
+  case blocked
+
+  public var title: String {
+    switch self {
+    case .admitting: "Admitting Issue"
+    case .prepared: "Workspace prepared"
+    case .implementing: "Implementing"
+    case .repairing: "Repairing candidate"
+    case .candidateFailed: "Candidate checks failed"
+    case .checked: "Candidate checks passed"
+    case .reviewing: "Reviewing candidate"
+    case .changesRequested: "Changes requested"
+    case .finalGoalPending: "Final repair goal"
+    case .reviewed: "Candidate reviewed"
+    case .publishing: "Publishing"
+    case .completed: "Completed"
+    case .blocked: "Blocked"
+    }
+  }
+
+  public var stage: AutomationRuntimeStage {
+    switch self {
+    case .admitting, .prepared: .prepare
+    case .implementing, .repairing, .candidateFailed, .changesRequested, .finalGoalPending:
+      .develop
+    case .checked: .validate
+    case .reviewing, .reviewed: .review
+    case .publishing, .completed, .blocked: .publish
+    }
+  }
+
+  public var isTerminal: Bool {
+    [.completed, .blocked].contains(self)
+  }
+}
+
+public enum ProductDevAutonomousRuntimeRole: String, Codable, Sendable {
+  case controller
+  case implementer
+  case reviewer
+}
+
+public struct ProductDevAutonomousRuntimeStatus: Codable, Equatable, Sendable {
+  public let schemaVersion: Int
+  public let profileID: String
+  public let repository: String
+  public let issueNumber: Int?
+  public let phase: ProductDevAutonomousRuntimePhase
+  public let role: ProductDevAutonomousRuntimeRole
+  public let headSHA: String?
+  public let repairAttempt: Int
+  public let reviewRound: Int
+  public let observedAt: Date
+
+  public init(
+    schemaVersion: Int = 1,
+    profileID: String = "moments-autonomous-v2",
+    repository: String,
+    issueNumber: Int?,
+    phase: ProductDevAutonomousRuntimePhase,
+    role: ProductDevAutonomousRuntimeRole,
+    headSHA: String?,
+    repairAttempt: Int,
+    reviewRound: Int,
+    observedAt: Date
+  ) {
+    self.schemaVersion = schemaVersion
+    self.profileID = profileID
+    self.repository = repository
+    self.issueNumber = issueNumber
+    self.phase = phase
+    self.role = role
+    self.headSHA = headSHA
+    self.repairAttempt = repairAttempt
+    self.reviewRound = reviewRound
+    self.observedAt = observedAt
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case schemaVersion = "schema_version"
+    case profileID = "profile_id"
+    case repository
+    case issueNumber = "issue_number"
+    case phase, role
+    case headSHA = "head_sha"
+    case repairAttempt = "repair_attempt"
+    case reviewRound = "review_round"
+    case observedAt = "observed_at"
+  }
+}
+
 public struct AutomationRuntimeObservation: Codable, Equatable, Sendable {
   public let availability: AutomationRuntimeAvailability
   public let status: AutomationRuntimeStatus?
+  public let autonomousStatus: ProductDevAutonomousRuntimeStatus?
   public let message: String?
 
   public init(
     availability: AutomationRuntimeAvailability,
     status: AutomationRuntimeStatus? = nil,
+    autonomousStatus: ProductDevAutonomousRuntimeStatus? = nil,
     message: String? = nil
   ) {
     self.availability = availability
     self.status = status
+    self.autonomousStatus = autonomousStatus
     self.message = message
   }
 
@@ -479,5 +586,31 @@ public struct AutomationRuntimeObservation: Codable, Equatable, Sendable {
 
   public static func invalid(_ message: String) -> Self {
     Self(availability: .invalid, message: message)
+  }
+
+  public static func autonomousLive(_ status: ProductDevAutonomousRuntimeStatus) -> Self {
+    Self(
+      availability: .live,
+      autonomousStatus: status,
+      message: "Read-only ProductDev autonomous runtime evidence."
+    )
+  }
+
+  public static func autonomousTerminal(
+    _ status: ProductDevAutonomousRuntimeStatus,
+    message: String? = nil
+  ) -> Self {
+    Self(availability: .terminal, autonomousStatus: status, message: message)
+  }
+
+  public static func autonomousStale(
+    _ status: ProductDevAutonomousRuntimeStatus,
+    message: String
+  ) -> Self {
+    Self(availability: .stale, autonomousStatus: status, message: message)
+  }
+
+  public var issueNumber: Int? {
+    self.autonomousStatus?.issueNumber ?? self.status?.issueNumber
   }
 }
