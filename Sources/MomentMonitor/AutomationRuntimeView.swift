@@ -2,6 +2,44 @@
   import MomentMonitorCore
   import SwiftUI
 
+  struct RolloverCurrentAutomationView: View {
+    let item: MonitorItem
+
+    var body: some View {
+      VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 8) {
+          Text("Current automation")
+            .font(.subheadline.weight(.semibold))
+          Spacer()
+          Text("RUNNING")
+            .font(.system(size: 9, weight: .bold, design: .rounded))
+            .foregroundStyle(.blue)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(Color.blue.opacity(0.12), in: Capsule())
+        }
+        Text(item.title)
+          .font(.callout.weight(.semibold))
+          .lineLimit(2)
+        HStack(spacing: 7) {
+          if let issueNumber = item.issueNumber { Text("Issue #\(issueNumber)") }
+          Text("GitHub running")
+        }
+        .font(.caption2.monospacedDigit())
+        .foregroundStyle(.secondary)
+        Text(
+          "Exact matching ProductDev runtime details are not available yet. The last controller outcome remains below."
+        )
+        .font(.caption2)
+        .foregroundStyle(.secondary)
+        .fixedSize(horizontal: false, vertical: true)
+      }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 10)
+      .accessibilityElement(children: .combine)
+    }
+  }
+
   struct AutomationRuntimeView: View {
     let observation: AutomationRuntimeObservation
 

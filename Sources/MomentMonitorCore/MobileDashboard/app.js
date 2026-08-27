@@ -225,7 +225,26 @@ function renderActivity(activity, now, isLive) {
   container.hidden = false;
 }
 
-function renderRuntime(runtime, now) {
+function renderRuntime(runtime, currentAutomation, now) {
+  if (currentAutomation) {
+    const badgeNode = byID("runtime-badge");
+    badgeNode.textContent = "RUNNING";
+    badgeNode.className = "status-badge status-live";
+    setText("runtime-kicker", "CURRENT AUTOMATION");
+    setText("runtime-heading", currentAutomation.title);
+    setText("runtime-detail", "GitHub running · exact matching ProductDev runtime details unavailable");
+    setText("runtime-issue", currentAutomation.issueNumber ? `Issue #${currentAutomation.issueNumber}` : "Issue —");
+    setText("runtime-issue-time", "Codex time not recorded");
+    setText("runtime-pr", "PR not observed for this Issue");
+    setText("runtime-time", relativeTime(currentAutomation.updatedAt, now));
+    const message = byID("runtime-message");
+    message.hidden = false;
+    message.textContent = `Last controller outcome remains Issue #${runtime.issueNumber ?? "unknown"} · ${runtime.phaseTitle || runtime.autonomousPhase || runtime.availability}${runtime.roundNumber ? ` · review round ${runtime.roundNumber}` : ""}.`;
+    renderStages(null, false);
+    renderStrategy(null);
+    renderActivity(null, now, false);
+    return;
+  }
   const [badge, badgeClass] = runtimeBadge(runtime);
   const badgeNode = byID("runtime-badge");
   badgeNode.textContent = badge;
@@ -478,7 +497,10 @@ function render() {
 
   renderCodexUsage(snapshot.codexUsage);
   renderOxAudit(snapshot.oxAudit, now);
-  renderRuntime(snapshot.runtime, now);
+  const runningLane = snapshot.lanes.find((lane) => lane.lane === "running");
+  const runningItem = runningLane?.items?.find((item) => item.issueNumber !== snapshot.runtime.issueNumber);
+  const rolloverCurrent = snapshot.runtime.availability === "terminal" ? runningItem : null;
+  renderRuntime(snapshot.runtime, rolloverCurrent, now);
   renderLanes(snapshot.lanes, now);
 }
 
