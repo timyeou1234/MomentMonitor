@@ -283,7 +283,7 @@ public struct ProductDevCutoverRuntimeStatusReader: AutomationRuntimeStatusReadi
       status.issueNumber == issueNumber,
       status.headSHA == headSHA,
       (0...3).contains(status.repairAttempt),
-      (0...4).contains(status.reviewRound),
+      status.reviewRound >= 0,
       status.role == Self.expectedRole(for: status.phase)
     else {
       throw ProductDevCutoverRuntimeError.invalid

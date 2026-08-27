@@ -8,7 +8,7 @@ final class ProductDevCutoverRuntimeStatusReaderTests: XCTestCase {
   private let now = Date(timeIntervalSince1970: 1_700_000_000)
 
   func testExactCutoverSelectsAutonomousRuntimeWithoutFabricatedLegacyIdentity() async throws {
-    let fixture = try self.makeFixture()
+    let fixture = try self.makeFixture(runtimeOverrides: ["review_round": 8])
     defer { try? FileManager.default.removeItem(at: fixture.directory) }
     let observation = await fixture.reader(now: self.now, processIsAlive: true).read(
       repository: .moment
@@ -19,7 +19,7 @@ final class ProductDevCutoverRuntimeStatusReaderTests: XCTestCase {
     XCTAssertEqual(observation.autonomousStatus?.issueNumber, 381)
     XCTAssertEqual(observation.autonomousStatus?.phase, .reviewing)
     XCTAssertEqual(observation.autonomousStatus?.role, .reviewer)
-    XCTAssertEqual(observation.autonomousStatus?.reviewRound, 2)
+    XCTAssertEqual(observation.autonomousStatus?.reviewRound, 8)
     XCTAssertEqual(observation.autonomousStatus?.repairAttempt, 1)
   }
 
@@ -82,6 +82,20 @@ final class ProductDevCutoverRuntimeStatusReaderTests: XCTestCase {
     )
     XCTAssertEqual(observation.availability, .invalid)
     XCTAssertNil(observation.autonomousStatus)
+
+    let negativeRound = try self.makeFixture(runtimeOverrides: ["review_round": -1])
+    defer { try? FileManager.default.removeItem(at: negativeRound.directory) }
+    observation = await negativeRound.reader(now: self.now, processIsAlive: true).read(
+      repository: .moment
+    )
+    XCTAssertEqual(observation.availability, .invalid)
+
+    let nonIntegerRound = try self.makeFixture(runtimeOverrides: ["review_round": "8"])
+    defer { try? FileManager.default.removeItem(at: nonIntegerRound.directory) }
+    observation = await nonIntegerRound.reader(now: self.now, processIsAlive: true).read(
+      repository: .moment
+    )
+    XCTAssertEqual(observation.availability, .invalid)
 
     let conflict = try self.makeFixture(runtimeOverrides: ["repository": "other/repository"])
     defer { try? FileManager.default.removeItem(at: conflict.directory) }
