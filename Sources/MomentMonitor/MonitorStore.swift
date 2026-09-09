@@ -51,6 +51,9 @@
     private var watchdogPollingTask: Task<Void, Never>?
     private var developmentObservationTask: Task<Void, Never>?
     private var pendingDevelopmentFingerprint: String?
+    private var configuredRepository: RepositoryCoordinate
+    private var repositoryGeneration = 0
+    private var latestRefreshID = 0
     private var codexUsageClient: CodexUsageClient?
     private let oxAuditReader = OxAuditStatusReader.live()
     private let watchdogReader = AutomationWatchdogStatusReader.live()
@@ -74,8 +77,12 @@
 
     init(defaults: UserDefaults = .standard) {
       self.defaults = defaults
-      self.repositoryText =
+      let repositoryText =
         defaults.string(forKey: "repository") ?? RepositoryCoordinate.moment.fullName
+      let configuredRepository =
+        (try? RepositoryCoordinate(parsing: repositoryText)) ?? .moment
+      self.repositoryText = repositoryText
+      self.configuredRepository = configuredRepository
       self.refreshIntervalSeconds = defaults.object(forKey: "refreshIntervalSeconds") as? Int ?? 30
       self.completedItemLimit = defaults.object(forKey: "completedItemLimit") as? Int ?? 8
       self.localModelObserverEnabled =
@@ -84,7 +91,7 @@
       self.mobileDashboardPort =
         defaults.object(forKey: "mobileDashboardPort") as? Int
         ?? MobileDashboardServer.defaultPort
-      let initialSnapshot = MomentMonitorSnapshot.empty(repository: .moment)
+      let initialSnapshot = MomentMonitorSnapshot.empty(repository: configuredRepository)
       let initialCodexUsage = CodexUsageObservation.unavailable(message: "Not refreshed yet.")
       self.snapshot = initialSnapshot
       self.codexUsage = initialCodexUsage
@@ -188,9 +195,15 @@
     }
 
     func refresh() async {
-      guard !self.isRefreshing else { return }
+      self.latestRefreshID += 1
+      let refreshID = self.latestRefreshID
+      let repositoryGeneration = self.repositoryGeneration
       self.isRefreshing = true
-      defer { self.isRefreshing = false }
+      defer {
+        if self.latestRefreshID == refreshID {
+          self.isRefreshing = false
+        }
+      }
 
       do {
         let configuration = try self.configuration()
@@ -205,13 +218,22 @@
         }
 
         let refreshed = try await service.refresh(configuration: configuration)
+        guard self.latestRefreshID == refreshID,
+          self.repositoryGeneration == repositoryGeneration
+        else { return }
         self.snapshot = refreshed
         self.scheduleDevelopmentObservation(for: refreshed)
         self.hasSuccessfulRefresh = true
         self.lastError = nil
       } catch {
+        guard self.latestRefreshID == refreshID,
+          self.repositoryGeneration == repositoryGeneration
+        else { return }
         if let service = self.service, let configuration = try? self.configuration() {
           let runtimeObservation = await service.readRuntimeStatus(configuration: configuration)
+          guard self.latestRefreshID == refreshID,
+            self.repositoryGeneration == repositoryGeneration
+          else { return }
           self.snapshot = self.snapshot.replacingRuntimeObservation(runtimeObservation)
           self.scheduleDevelopmentObservation(for: self.snapshot)
         }
@@ -231,9 +253,12 @@
     }
 
     func refreshWatchdog() async {
-      let repository = self.snapshot.repository
+      let repository = self.configuredRepository
+      let repositoryGeneration = self.repositoryGeneration
       let observation = await self.watchdogReader.read(repository: repository)
-      guard self.snapshot.repository == repository else { return }
+      guard self.repositoryGeneration == repositoryGeneration,
+        self.configuredRepository == repository
+      else { return }
       self.watchdog = observation
     }
 
@@ -264,7 +289,7 @@
     func applyPreferences() async {
       let configuration: MonitorConfiguration
       do {
-        configuration = try self.configuration()
+        configuration = try self.draftConfiguration()
       } catch {
         self.settingsFeedback = error.localizedDescription
         self.settingsFeedbackIsError = true
@@ -278,6 +303,18 @@
         self.settingsFeedback = self.mobileDashboardValidationMessage
         self.settingsFeedbackIsError = true
         return
+      }
+      let repositoryChanged =
+        self.configuredRepository.fullName.caseInsensitiveCompare(
+          configuration.repository.fullName
+        ) != .orderedSame
+      self.configuredRepository = configuration.repository
+      self.repositoryGeneration += 1
+      self.watchdog = .absent
+      if repositoryChanged {
+        self.snapshot = .empty(repository: configuration.repository)
+        self.hasSuccessfulRefresh = false
+        self.lastError = nil
       }
       self.defaults.set(self.repositoryText, forKey: "repository")
       self.defaults.set(self.refreshIntervalSeconds, forKey: "refreshIntervalSeconds")
@@ -326,6 +363,14 @@
 
     private func configuration() throws -> MonitorConfiguration {
       MonitorConfiguration(
+        repository: self.configuredRepository,
+        refreshIntervalSeconds: TimeInterval(self.refreshIntervalSeconds),
+        completedItemLimit: self.completedItemLimit
+      )
+    }
+
+    private func draftConfiguration() throws -> MonitorConfiguration {
+      MonitorConfiguration(
         repository: try RepositoryCoordinate(parsing: self.repositoryText),
         refreshIntervalSeconds: TimeInterval(self.refreshIntervalSeconds),
         completedItemLimit: self.completedItemLimit
@@ -353,7 +398,11 @@
           guard !Task.isCancelled, let service = self.service,
             let configuration = try? self.configuration()
           else { continue }
+          let repositoryGeneration = self.repositoryGeneration
           let observation = await service.readRuntimeStatus(configuration: configuration)
+          guard self.repositoryGeneration == repositoryGeneration,
+            self.configuredRepository == configuration.repository
+          else { continue }
           if observation != self.snapshot.runtimeObservation {
             self.snapshot = self.snapshot.replacingRuntimeObservation(observation)
             self.scheduleDevelopmentObservation(for: self.snapshot)

@@ -157,6 +157,30 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
     XCTAssertEqual(observation.availability, .invalid)
   }
 
+  func testRejectsProducerImpossibleWorkerTopology() async throws {
+    for mutation in ["unknown-worker", "duplicate-issue"] {
+      var fixture = Self.fixture()
+      var workers = fixture["workers"] as! [[String: Any]]
+      if mutation == "unknown-worker" {
+        workers[0]["worker_id"] = "worker-2"
+      } else {
+        var duplicate = workers[0]
+        duplicate["worker_id"] = "worker-1"
+        workers.append(duplicate)
+      }
+      fixture["workers"] = workers
+      try self.write(fixture)
+      let reader = AutomationWatchdogStatusReader(
+        fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+        currentUserID: Darwin.getuid()
+      )
+
+      let observation = await reader.read(repository: .moment)
+
+      XCTAssertEqual(observation.availability, .invalid, "Accepted \(mutation)")
+    }
+  }
+
   func testRejectsRuntimeAvailabilityContradiction() async throws {
     var fixture = Self.fixture()
     var workers = fixture["workers"] as! [[String: Any]]
@@ -288,6 +312,46 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
     XCTAssertEqual(observation.availability, .invalid)
   }
 
+  func testRejectsWaitingProcessAtWorkingCPU() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    var process = workers[0]["process"] as! [String: Any]
+    process["activity"] = "waiting"
+    process["max_cpu_percent"] = 999.0
+    workers[0]["process"] = process
+    fixture["workers"] = workers
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsDuplicateKeysAtEveryContractObjectLevel() throws {
+    let data = try JSONSerialization.data(
+      withJSONObject: Self.fixture(), options: [.sortedKeys]
+    )
+    let json = try XCTUnwrap(String(data: data, encoding: .utf8))
+    let mutations = [
+      ("{", "{\"schema\":\"moment.automation-watchdog.v1\","),
+      ("\"worker_id\":\"worker-0\"", "\"worker_id\":\"worker-0\",\"worker_id\":\"worker-0\""),
+      ("\"root_present\":true", "\"root_present\":true,\"root_present\":true"),
+      ("\"action\":\"observe\"", "\"action\":\"observe\",\"action\":\"observe\""),
+    ]
+
+    for (needle, replacement) in mutations {
+      let duplicateJSON = try XCTUnwrap(
+        json.replacingFirstOccurrence(of: needle, with: replacement).data(using: .utf8)
+      )
+
+      XCTAssertThrowsError(try AutomationWatchdogStatusReader.decodeAndValidate(duplicateJSON))
+    }
+  }
+
   func testRejectsNonIdentifierModel() async throws {
     var fixture = Self.fixture()
     fixture["model"] = "Qwen\nprivate"
@@ -365,5 +429,12 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
         ]
       ],
     ]
+  }
+}
+
+extension String {
+  fileprivate func replacingFirstOccurrence(of target: String, with replacement: String) -> String {
+    guard let range = self.range(of: target) else { return self }
+    return self.replacingCharacters(in: range, with: replacement)
   }
 }

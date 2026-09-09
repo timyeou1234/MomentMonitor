@@ -139,6 +139,116 @@ public struct AutomationWatchdogObservation: Codable, Equatable, Sendable {
   }
 }
 
+private struct JSONDuplicateKeyValidator {
+  private enum ParseError: Error { case malformed }
+
+  private let bytes: [UInt8]
+  private var index = 0
+
+  init(data: Data) {
+    self.bytes = Array(data)
+  }
+
+  mutating func validate() throws {
+    try self.parseValue()
+    self.skipWhitespace()
+    guard self.index == self.bytes.count else { throw ParseError.malformed }
+  }
+
+  private mutating func parseValue() throws {
+    self.skipWhitespace()
+    guard let byte = self.peek() else { throw ParseError.malformed }
+    switch byte {
+    case 0x7B: try self.parseObject()
+    case 0x5B: try self.parseArray()
+    case 0x22: _ = try self.parseString()
+    default: try self.parsePrimitive()
+    }
+  }
+
+  private mutating func parseObject() throws {
+    try self.expect(0x7B)
+    self.skipWhitespace()
+    if self.consume(0x7D) { return }
+    var keys = Set<String>()
+    while true {
+      self.skipWhitespace()
+      let key = try self.parseString()
+      guard keys.insert(key).inserted else { throw ParseError.malformed }
+      self.skipWhitespace()
+      try self.expect(0x3A)
+      try self.parseValue()
+      self.skipWhitespace()
+      if self.consume(0x7D) { return }
+      try self.expect(0x2C)
+    }
+  }
+
+  private mutating func parseArray() throws {
+    try self.expect(0x5B)
+    self.skipWhitespace()
+    if self.consume(0x5D) { return }
+    while true {
+      try self.parseValue()
+      self.skipWhitespace()
+      if self.consume(0x5D) { return }
+      try self.expect(0x2C)
+    }
+  }
+
+  private mutating func parseString() throws -> String {
+    let start = self.index
+    try self.expect(0x22)
+    var escaped = false
+    while self.index < self.bytes.count {
+      let byte = self.bytes[self.index]
+      self.index += 1
+      if escaped {
+        escaped = false
+      } else if byte == 0x5C {
+        escaped = true
+      } else if byte == 0x22 {
+        let data = Data(self.bytes[start..<self.index])
+        guard let value = try? JSONDecoder().decode(String.self, from: data) else {
+          throw ParseError.malformed
+        }
+        return value
+      }
+    }
+    throw ParseError.malformed
+  }
+
+  private mutating func parsePrimitive() throws {
+    let start = self.index
+    while let byte = self.peek(), !Self.isWhitespace(byte), ![0x2C, 0x5D, 0x7D].contains(byte) {
+      self.index += 1
+    }
+    guard self.index > start else { throw ParseError.malformed }
+  }
+
+  private mutating func skipWhitespace() {
+    while let byte = self.peek(), Self.isWhitespace(byte) { self.index += 1 }
+  }
+
+  private mutating func expect(_ byte: UInt8) throws {
+    guard self.consume(byte) else { throw ParseError.malformed }
+  }
+
+  private mutating func consume(_ byte: UInt8) -> Bool {
+    guard self.peek() == byte else { return false }
+    self.index += 1
+    return true
+  }
+
+  private func peek() -> UInt8? {
+    self.index < self.bytes.count ? self.bytes[self.index] : nil
+  }
+
+  private static func isWhitespace(_ byte: UInt8) -> Bool {
+    [0x09, 0x0A, 0x0D, 0x20].contains(byte)
+  }
+}
+
 public struct AutomationWatchdogStatusReader: Sendable {
   public static let maximumBytes = 32 * 1024
   public static let freshnessInterval: TimeInterval = 5 * 60
@@ -217,7 +327,12 @@ public struct AutomationWatchdogStatusReader: Sendable {
   }
 
   static func decodeAndValidate(_ data: Data) throws -> AutomationWatchdogStatus {
-    guard data.count <= Self.maximumBytes,
+    guard data.count <= Self.maximumBytes else { throw AutomationWatchdogReadError.sizeLimit }
+    var duplicateKeyValidator = JSONDuplicateKeyValidator(data: data)
+    do { try duplicateKeyValidator.validate() } catch {
+      throw AutomationWatchdogReadError.invalidJSON
+    }
+    guard
       let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any]
     else { throw AutomationWatchdogReadError.invalidJSON }
     guard Set(raw.keys) == topLevelKeys else { throw AutomationWatchdogReadError.unknownFields }
@@ -235,8 +350,9 @@ public struct AutomationWatchdogStatusReader: Sendable {
       status.repository.map({
         $0.range(of: #"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil
       }) ?? true,
-      status.workers.count <= 8,
-      Set(status.workers.map(\.workerID)).count == status.workers.count
+      status.workers.count <= 2,
+      Set(status.workers.map(\.workerID)).count == status.workers.count,
+      Set(status.workers.map(\.issueNumber)).count == status.workers.count
     else { throw AutomationWatchdogReadError.unsupportedSchema }
     guard let rawWorkers = raw["workers"] as? [[String: Any]],
       rawWorkers.count == status.workers.count
@@ -244,7 +360,7 @@ public struct AutomationWatchdogStatusReader: Sendable {
     for (worker, object) in zip(status.workers, rawWorkers) {
       let allowed = workerKeys.union(worker.decision == nil ? [] : ["decision"])
       guard Set(object.keys) == allowed,
-        worker.workerID.range(of: #"^worker-[0-9]+$"#, options: .regularExpression) != nil,
+        ["worker-0", "worker-1"].contains(worker.workerID),
         worker.issueNumber > 0,
         ["running", "continuing"].contains(worker.leaseStatus),
         worker.leaseAgeSeconds >= 0,
@@ -305,7 +421,8 @@ public struct AutomationWatchdogStatusReader: Sendable {
       return !process.rootPresent && process.descendantCount == 0
         && process.maxCPUPercent == 0 && process.activityKind == "none"
     }
-    return process.activityKind != "none"
+    return (process.activity != "waiting" || process.maxCPUPercent < 1)
+      && process.activityKind != "none"
       && (process.rootPresent || process.descendantCount > 0)
   }
 
