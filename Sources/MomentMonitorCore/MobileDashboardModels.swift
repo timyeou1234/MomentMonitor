@@ -59,7 +59,7 @@ public struct MobileAutomationWatchdogSummary: Codable, Equatable, Sendable {
   public let observedAt: Date?
   public let confidenceThreshold: Double?
   public let requiredObservations: Int?
-  public let workers: [AutomationWatchdogWorker]
+  public let workers: [MobileAutomationWatchdogWorker]
   public let message: String?
 
   public init(observation: AutomationWatchdogObservation) {
@@ -69,8 +69,54 @@ public struct MobileAutomationWatchdogSummary: Codable, Equatable, Sendable {
     self.observedAt = observation.status?.observedAt
     self.confidenceThreshold = observation.status?.confidenceThreshold
     self.requiredObservations = observation.status?.requiredObservations
-    self.workers = observation.status?.workers ?? []
+    self.workers = observation.status?.workers.map(MobileAutomationWatchdogWorker.init) ?? []
     self.message = observation.message
+  }
+}
+
+public struct MobileAutomationWatchdogWorker: Codable, Equatable, Sendable {
+  public let workerID: String
+  public let issueNumber: Int
+  public let phase: String
+  public let role: String
+  public let process: MobileAutomationWatchdogProcess
+  public let modelAvailable: Bool
+  public let decision: MobileAutomationWatchdogDecision?
+
+  public init(worker: AutomationWatchdogWorker) {
+    self.workerID = worker.workerID
+    self.issueNumber = worker.issueNumber
+    self.phase = worker.phase
+    self.role = worker.role
+    self.process = MobileAutomationWatchdogProcess(process: worker.process)
+    self.modelAvailable = worker.modelAvailable
+    self.decision = worker.decision.map(MobileAutomationWatchdogDecision.init)
+  }
+}
+
+public struct MobileAutomationWatchdogProcess: Codable, Equatable, Sendable {
+  public let activityKind: String
+  public let activity: String
+
+  public init(process: AutomationWatchdogProcess) {
+    self.activityKind = process.activityKind
+    self.activity = process.activity
+  }
+}
+
+public struct MobileAutomationWatchdogDecision: Codable, Equatable, Sendable {
+  public let action: AutomationWatchdogAction
+  public let confidence: Double
+  public let streak: Int
+  public let requiredStreak: Int
+  public let summary: String
+
+  public init(decision: AutomationWatchdogDecision) {
+    self.action = decision.action
+    self.confidence = decision.confidence
+    self.streak = decision.streak
+    self.requiredStreak = decision.requiredStreak
+    self.summary = decision.summary
   }
 }
 

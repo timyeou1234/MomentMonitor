@@ -26,16 +26,20 @@ final class ReadOnlyContractTests: XCTestCase {
 
   func testCodexAppServerMessagesAreUsageReadOnly() throws {
     let payload = ProcessCodexAppServerRunner.rateLimitRequestPayload()
-    let methods = try String(decoding: payload, as: UTF8.self)
+    let messages = try String(decoding: payload, as: UTF8.self)
       .split(whereSeparator: \Character.isNewline)
-      .map { line -> String in
-        let object = try XCTUnwrap(
+      .map { line -> [String: Any] in
+        try XCTUnwrap(
           JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any]
         )
-        return try XCTUnwrap(object["method"] as? String)
       }
+    let methods = try messages.map { try XCTUnwrap($0["method"] as? String) }
+    let initialize = try XCTUnwrap(messages.first)
+    let parameters = try XCTUnwrap(initialize["params"] as? [String: Any])
+    let clientInfo = try XCTUnwrap(parameters["clientInfo"] as? [String: Any])
 
     XCTAssertEqual(methods, ["initialize", "initialized", "account/rateLimits/read"])
+    XCTAssertEqual(clientInfo["version"] as? String, "0.7.0")
     XCTAssertFalse(methods.contains("account/usage/read"))
     XCTAssertFalse(methods.contains(where: { $0.hasPrefix("thread/") || $0.hasPrefix("turn/") }))
   }

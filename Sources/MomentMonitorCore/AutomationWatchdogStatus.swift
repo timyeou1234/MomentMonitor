@@ -166,10 +166,11 @@ public struct AutomationWatchdogStatusReader: Sendable {
     )
   }
 
-  public func read() async -> AutomationWatchdogObservation {
+  public func read(repository: RepositoryCoordinate) async -> AutomationWatchdogObservation {
     do {
       guard let data = try self.readSecurely() else { return .absent }
       let status = try Self.decodeAndValidate(data)
+      guard status.repository == repository.fullName else { return .absent }
       let age = self.now().timeIntervalSince(status.observedAt)
       guard age >= -30 else { return .invalid("Active observer timestamp is in the future.") }
       if age > Self.freshnessInterval { return .stale(status) }
@@ -222,14 +223,15 @@ public struct AutomationWatchdogStatusReader: Sendable {
       throw AutomationWatchdogReadError.invalidJSON
     }
     guard status.schema == "moment.automation-watchdog.v1",
-      !status.model.isEmpty, status.model.count <= 128,
+      isBoundedIdentifier(status.model, maximum: 128),
       (0...1).contains(status.confidenceThreshold),
       status.confidenceThreshold >= 0.8,
       status.requiredObservations >= 2, status.requiredObservations <= 10,
       status.repository.map({
         $0.range(of: #"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"#, options: .regularExpression) != nil
       }) ?? true,
-      status.workers.count <= 8
+      status.workers.count <= 8,
+      Set(status.workers.map(\.workerID)).count == status.workers.count
     else { throw AutomationWatchdogReadError.unsupportedSchema }
     guard let rawWorkers = raw["workers"] as? [[String: Any]],
       rawWorkers.count == status.workers.count
@@ -239,15 +241,19 @@ public struct AutomationWatchdogStatusReader: Sendable {
       guard Set(object.keys) == allowed,
         worker.workerID.range(of: #"^worker-[0-9]+$"#, options: .regularExpression) != nil,
         worker.issueNumber > 0,
+        ["running", "continuing"].contains(worker.leaseStatus),
         worker.leaseAgeSeconds >= 0,
+        abs(worker.leaseRemainingSeconds) <= 7 * 24 * 60 * 60,
         worker.runtimeAgeSeconds.map({ $0 >= 0 }) ?? true,
-        worker.phase.count <= 64, worker.role.count <= 64,
+        isBoundedRuntimeLabel(worker.phase), isBoundedRuntimeLabel(worker.role),
         worker.process.descendantCount >= 0,
         (0...999).contains(worker.process.maxCPUPercent),
         ["none", "compiler", "build", "vcs", "agent", "controller", "shell", "other"].contains(
           worker.process.activityKind),
         ["absent", "waiting", "working"].contains(worker.process.activity),
-        let process = object["process"] as? [String: Any], Set(process.keys) == processKeys
+        let process = object["process"] as? [String: Any], Set(process.keys) == processKeys,
+        worker.modelAvailable == (worker.decision != nil),
+        runtimeFieldsAreCoherent(worker)
       else { throw AutomationWatchdogReadError.invalidWorker }
       if let decision = worker.decision {
         guard let rawDecision = object["decision"] as? [String: Any],
@@ -255,12 +261,64 @@ public struct AutomationWatchdogStatusReader: Sendable {
           (0...1).contains(decision.confidence),
           decision.streak >= 0, decision.streak <= decision.requiredStreak,
           decision.requiredStreak == status.requiredObservations,
-          decision.summary.count <= 240
+          decision.decidedAt <= status.observedAt.addingTimeInterval(30),
+          decision.decidedAt >= status.observedAt.addingTimeInterval(-freshnessInterval),
+          decision.summary == decisionSummary[decision.action]
         else { throw AutomationWatchdogReadError.invalidDecision }
       }
     }
+    guard stateIsCoherent(status) else { throw AutomationWatchdogReadError.unsupportedSchema }
     return status
   }
+
+  private static func isBoundedIdentifier(_ value: String, maximum: Int) -> Bool {
+    !value.isEmpty && value.count <= maximum
+      && value.allSatisfy(\.isASCII) && value.allSatisfy(\.isWholeNumberOrIdentifierPunctuation)
+  }
+
+  private static func isBoundedRuntimeLabel(_ value: String) -> Bool {
+    value.range(of: #"^(?:unavailable|[a-z][a-z0-9_]{0,63})$"#, options: .regularExpression)
+      != nil
+  }
+
+  private static func runtimeFieldsAreCoherent(_ worker: AutomationWatchdogWorker) -> Bool {
+    if worker.runtimeAvailable {
+      return worker.runtimeAgeSeconds != nil
+        && worker.phase != "unavailable" && worker.role != "unavailable"
+    }
+    return worker.runtimeAgeSeconds == nil
+      && worker.phase == "unavailable" && worker.role == "unavailable"
+  }
+
+  private static func stateIsCoherent(_ status: AutomationWatchdogStatus) -> Bool {
+    let decisions = status.workers.compactMap(\.decision)
+    let admitted = decisions.filter {
+      $0.confidence >= status.confidenceThreshold && $0.streak >= status.requiredObservations
+        && [.unblock, .takeover].contains($0.action)
+    }
+    switch status.state {
+    case .idle:
+      return status.workers.isEmpty
+    case .observing:
+      return !status.workers.isEmpty && decisions.allSatisfy { $0.action == .observe }
+    case .suspectedStall:
+      return !status.workers.isEmpty && admitted.isEmpty
+        && decisions.contains { [.unblock, .takeover].contains($0.action) }
+    case .unblocking:
+      return admitted.contains { $0.action == .unblock }
+        && !admitted.contains { $0.action == .takeover }
+    case .takeover:
+      return admitted.contains { $0.action == .takeover }
+    case .unavailable:
+      return decisions.isEmpty && status.workers.allSatisfy { !$0.modelAvailable }
+    }
+  }
+
+  private static let decisionSummary: [AutomationWatchdogAction: String] = [
+    .observe: "Local model found no actionable stall.",
+    .unblock: "Local model recommends bounded recovery.",
+    .takeover: "Local model recommends isolated repair ownership.",
+  ]
 
   private static let topLevelKeys: Set<String> = [
     "schema", "observed_at", "state", "model", "confidence_threshold",
@@ -277,6 +335,12 @@ public struct AutomationWatchdogStatusReader: Sendable {
   private static let decisionKeys: Set<String> = [
     "action", "confidence", "streak", "required_streak", "decided_at", "summary",
   ]
+}
+
+extension Character {
+  fileprivate var isWholeNumberOrIdentifierPunctuation: Bool {
+    self.isLetter || self.isNumber || "._-:".contains(self)
+  }
 }
 
 extension JSONDecoder.DateDecodingStrategy {

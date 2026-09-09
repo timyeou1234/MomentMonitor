@@ -120,7 +120,7 @@ final class MobileDashboardTests: XCTestCase {
             streak: 0,
             requiredStreak: 2,
             decidedAt: activityDate,
-            summary: "Active compilation is plausible progress."
+            summary: "Local model found no actionable stall."
           )
         )
       ]
@@ -130,6 +130,12 @@ final class MobileDashboardTests: XCTestCase {
     let data = try store.encodedSnapshot(servedAt: fixedDate("2026-08-22T07:00:01Z"))
     let decoded = try JSONDecoder.mobileDashboard.decode(MobileDashboardEnvelope.self, from: data)
     let rendered = String(decoding: data, as: UTF8.self)
+    let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let rawWatchdog = try XCTUnwrap(raw["watchdog"] as? [String: Any])
+    let rawWorkers = try XCTUnwrap(rawWatchdog["workers"] as? [[String: Any]])
+    let rawWorker = try XCTUnwrap(rawWorkers.first)
+    let rawProcess = try XCTUnwrap(rawWorker["process"] as? [String: Any])
+    let rawDecision = try XCTUnwrap(rawWorker["decision"] as? [String: Any])
 
     XCTAssertEqual(decoded.schemaVersion, 7)
     XCTAssertEqual(decoded.repository, "timyeou1234/Moment")
@@ -152,6 +158,22 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertEqual(decoded.watchdog.state, .observing)
     XCTAssertEqual(decoded.watchdog.workers.first?.process.activityKind, "compiler")
     XCTAssertEqual(decoded.watchdog.workers.first?.decision?.action, .observe)
+    XCTAssertEqual(
+      Set(rawWatchdog.keys),
+      [
+        "availability", "state", "model", "observedAt", "confidenceThreshold",
+        "requiredObservations", "workers",
+      ])
+    XCTAssertEqual(
+      Set(rawWorker.keys),
+      ["workerID", "issueNumber", "phase", "role", "process", "modelAvailable", "decision"])
+    XCTAssertEqual(Set(rawProcess.keys), ["activityKind", "activity"])
+    XCTAssertEqual(
+      Set(rawDecision.keys), ["action", "confidence", "streak", "requiredStreak", "summary"])
+    XCTAssertNil(rawWorker["lease_status"])
+    XCTAssertNil(rawWorker["leaseAgeSeconds"])
+    XCTAssertNil(rawProcess["rootPresent"])
+    XCTAssertNil(rawDecision["decidedAt"])
     XCTAssertEqual(decoded.lanes.first?.items.first?.issueNumber, 237)
     XCTAssertEqual(
       decoded.lanes.first?.items.first?.automationDurationMilliseconds, 3_601_000)
@@ -164,6 +186,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertFalse(rendered.contains("lifetimeTokens"))
     XCTAssertFalse(rendered.contains("prompt"))
     XCTAssertFalse(rendered.contains("response"))
+    XCTAssertFalse(rendered.contains("finding"))
 
     let oldActivityEnvelope = MobileDashboardEnvelope(
       snapshot: snapshot,

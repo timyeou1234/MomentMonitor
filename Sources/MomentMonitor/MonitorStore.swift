@@ -226,7 +226,11 @@
     }
 
     func refreshWatchdog() async {
-      self.watchdog = await self.watchdogReader.read()
+      guard let repository = try? RepositoryCoordinate(parsing: self.repositoryText) else {
+        self.watchdog = .absent
+        return
+      }
+      self.watchdog = await self.watchdogReader.read(repository: repository)
     }
 
     func refreshCodexUsage() async {

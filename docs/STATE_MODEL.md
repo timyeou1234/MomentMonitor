@@ -77,8 +77,21 @@ Viewer 不從 GitHub label、elapsed time 或歷史文字補猜缺失的 round�
 CLI 不存在、目前 authentication mode 不支援、逾時、欄位缺失或百分比超出 0...100 時會顯示 Unavailable，不沿用舊數值或從本機 token/log 猜測。這份資料不代表帳單餘額，也不授權 viewer 啟動 agent、購買 credits 或消耗 reset credit。
 
 Optional phone dashboard 會把同一份 reconciled state 轉成 versioned、sanitized
-的 `schemaVersion: 4` snapshot。它不另外推算 phase 或 completion：精確的 local
+的 `schemaVersion: 7` snapshot。它不另外推算 phase 或 completion：精確的 local
 phase 仍來自通過驗證的 controller record，merged/closed completion 仍由 GitHub 證明。
+
+## Active Auto watchdog
+
+`MomentAutomationMaintenance/watchdog/current.json` 是 producer-owned、mode `0600`
+的唯讀狀態。Viewer 只接受符合設定 `RepositoryCoordinate` 的 v1 record；不同
+repository 視為 absent。未知欄位、lease state、重複 worker ID、不一致的 runtime／model
+availability、非 allow-listed decision summary，或與 worker decisions 矛盾的 overall state
+都 fail closed 為 Invalid。
+
+Mac app 使用已驗證的 core model。`schemaVersion: 7` 手機 API 則另外映射到明確的
+watchdog DTO allowlist，只發布 logical worker ID、Issue、phase、role、bounded activity enum、
+model availability，以及固定摘要的 action/confidence/streak。它不序列化 lease timing、
+process root/count/CPU、decision timestamp，亦不會因 core model 未來新增欄位而自動公開。
 
 ## Workflow relevance
 

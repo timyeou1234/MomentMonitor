@@ -28,7 +28,7 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
       now: { fixedDate("2026-09-09T13:32:00Z") }
     )
 
-    let observation = await reader.read()
+    let observation = await reader.read(repository: .moment)
 
     XCTAssertEqual(observation.availability, .current)
     XCTAssertEqual(observation.status?.state, .observing)
@@ -48,7 +48,7 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
       currentUserID: Darwin.getuid()
     )
 
-    let observation = await reader.read()
+    let observation = await reader.read(repository: .moment)
 
     XCTAssertEqual(observation.availability, .invalid)
     XCTAssertNil(observation.status)
@@ -62,10 +62,148 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
       now: { fixedDate("2026-09-09T13:40:00Z") }
     )
 
-    let observation = await reader.read()
+    let observation = await reader.read(repository: .moment)
 
     XCTAssertEqual(observation.availability, .stale)
     XCTAssertEqual(observation.status?.workers.first?.workerID, "worker-0")
+  }
+
+  func testTreatsAnotherRepositoryAsAbsent() async throws {
+    try self.write(Self.fixture(repository: "example/Elsewhere"))
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation, .absent)
+  }
+
+  func testRejectsUnknownLeaseState() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    workers[0]["lease_status"] = "finished"
+    fixture["workers"] = workers
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsDuplicateWorkerIDs() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    workers.append(workers[0])
+    fixture["workers"] = workers
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsRuntimeAvailabilityContradiction() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    workers[0]["runtime_available"] = false
+    fixture["workers"] = workers
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsModelAvailabilityContradiction() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    workers[0]["model_available"] = false
+    fixture["workers"] = workers
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsNonAllowlistedDecisionSummary() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    var decision = workers[0]["decision"] as! [String: Any]
+    decision["summary"] = "A prompt-derived summary must never be displayed."
+    workers[0]["decision"] = decision
+    fixture["workers"] = workers
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsStateThatContradictsWorkerDecisions() async throws {
+    var fixture = Self.fixture()
+    fixture["state"] = "idle"
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsNonIdentifierModel() async throws {
+    var fixture = Self.fixture()
+    fixture["model"] = "Qwen\nprivate"
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsNonIdentifierRuntimeLabels() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    workers[0]["phase"] = "PR Fast"
+    fixture["workers"] = workers
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
   }
 
   private func write(_ value: [String: Any]) throws {
@@ -76,7 +214,7 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
     )
   }
 
-  private static func fixture() -> [String: Any] {
+  private static func fixture(repository: String = "timyeou1234/Moment") -> [String: Any] {
     [
       "schema": "moment.automation-watchdog.v1",
       "observed_at": "2026-09-09T13:31:33Z",
@@ -84,7 +222,7 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
       "model": "Qwen3.5-27B-4bit",
       "confidence_threshold": 0.8,
       "required_observations": 2,
-      "repository": "timyeou1234/Moment",
+      "repository": repository,
       "workers": [
         [
           "worker_id": "worker-0",
@@ -110,7 +248,7 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
             "streak": 0,
             "required_streak": 2,
             "decided_at": "2026-09-09T13:31:33Z",
-            "summary": "Normal compiler activity is visible.",
+            "summary": "Local model found no actionable stall.",
           ],
         ]
       ],
