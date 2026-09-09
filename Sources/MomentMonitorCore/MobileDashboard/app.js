@@ -396,12 +396,16 @@ function renderWatchdog(watchdog, now) {
   if (card.hidden) return;
   setText("watchdog-heading", watchdogStateTitle(watchdog.state));
   const badge = byID("watchdog-badge");
-  const danger = watchdog.availability === "invalid" || watchdog.state === "unavailable";
+  const invalid = watchdog.availability === "invalid";
+  const unavailable = watchdog.state === "unavailable";
+  const danger = invalid || unavailable;
   const warning = watchdog.availability === "stale"
     || ["suspected_stall", "unblocking", "takeover"].includes(watchdog.state);
-  badge.textContent = watchdog.availability === "stale"
+  badge.textContent = invalid
+    ? "INVALID"
+    : watchdog.availability === "stale"
     ? "STALE"
-    : danger ? "INVALID" : watchdog.state === "idle" ? "IDLE" : "LIVE";
+    : unavailable ? "UNAVAILABLE" : watchdog.state === "idle" ? "IDLE" : "LIVE";
   badge.className = `status-badge ${danger ? "status-danger" : warning ? "status-warning" : "status-live"}`;
   const threshold = Number.isFinite(watchdog.confidenceThreshold)
     ? `${Math.round(watchdog.confidenceThreshold * 100)}%`

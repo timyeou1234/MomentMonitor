@@ -231,7 +231,10 @@
     }
 
     func refreshWatchdog() async {
-      self.watchdog = await self.watchdogReader.read(repository: self.snapshot.repository)
+      let repository = self.snapshot.repository
+      let observation = await self.watchdogReader.read(repository: repository)
+      guard self.snapshot.repository == repository else { return }
+      self.watchdog = observation
     }
 
     func refreshCodexUsage() async {

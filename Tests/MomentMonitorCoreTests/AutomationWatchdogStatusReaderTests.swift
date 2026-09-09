@@ -54,6 +54,20 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
     XCTAssertNil(observation.status)
   }
 
+  func testRejectsFIFOWithoutBlockingForAWriter() async throws {
+    let file = self.temporaryDirectory.appendingPathComponent("current.json")
+    XCTAssertEqual(Darwin.mkfifo(file.path, 0o600), 0)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: file,
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+    XCTAssertEqual(observation.message, "Active observer status is not a regular file.")
+  }
+
   func testMarksOldStatusStale() async throws {
     try self.write(Self.fixture())
     let reader = AutomationWatchdogStatusReader(

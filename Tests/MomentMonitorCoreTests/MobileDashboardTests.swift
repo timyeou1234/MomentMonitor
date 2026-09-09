@@ -217,6 +217,16 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("renderCodexUsage"))
     XCTAssertTrue(javascript.contains("renderOxAudit"))
     XCTAssertTrue(javascript.contains("renderWatchdog"))
+    XCTAssertTrue(javascript.contains(": unavailable ? \"UNAVAILABLE\""))
+    let watchdogRendererStart = try XCTUnwrap(javascript.range(of: "function renderWatchdog"))
+    let watchdogRendererEnd = try XCTUnwrap(
+      javascript.range(
+        of: "function createWorkItem", range: watchdogRendererStart.upperBound..<javascript.endIndex
+      )
+    )
+    let watchdogRenderer = javascript[
+      watchdogRendererStart.lowerBound..<watchdogRendererEnd.lowerBound]
+    XCTAssertFalse(watchdogRenderer.contains("danger ? \"INVALID\""))
     for camelCaseField in [
       "watchdog.confidenceThreshold", "watchdog.requiredObservations",
       "watchdog.observedAt", "worker.workerID", "worker.issueNumber",
@@ -307,6 +317,21 @@ final class MobileDashboardTests: XCTestCase {
 
     XCTAssertEqual(watchdog["availability"] as? String, "absent")
     XCTAssertEqual(Set(watchdog.keys), ["availability", "workers"])
+  }
+
+  func testEnvelopePreservesInvalidWatchdogWithoutPublishingStatus() throws {
+    let store = MobileDashboardSnapshotStore(
+      snapshot: .empty(repository: .moment),
+      watchdog: .invalid("Active observer status is invalid.")
+    )
+
+    let data = try store.encodedSnapshot()
+    let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let watchdog = try XCTUnwrap(raw["watchdog"] as? [String: Any])
+
+    XCTAssertEqual(watchdog["availability"] as? String, "invalid")
+    XCTAssertEqual(watchdog["message"] as? String, "Active observer status is invalid.")
+    XCTAssertEqual(Set(watchdog.keys), ["availability", "message", "workers"])
   }
 
   #if os(macOS)

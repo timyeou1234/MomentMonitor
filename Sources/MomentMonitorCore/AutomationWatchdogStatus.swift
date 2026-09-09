@@ -183,7 +183,10 @@ public struct AutomationWatchdogStatusReader: Sendable {
   }
 
   private func readSecurely() throws -> Data? {
-    let descriptor = Darwin.open(self.fileURL.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    let descriptor = Darwin.open(
+      self.fileURL.path,
+      O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK
+    )
     if descriptor < 0 {
       if errno == ENOENT { return nil }
       if errno == ELOOP { throw AutomationWatchdogReadError.symbolicLink }

@@ -330,8 +330,14 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
     let values = self.lock.withLock {
       (self.snapshot, self.codexUsage, self.oxAudit, self.watchdog)
     }
-    let watchdog =
-      values.3.status?.repository == values.0.repository.fullName ? values.3 : .absent
+    let watchdog: AutomationWatchdogObservation
+    switch values.3.availability {
+    case .current, .stale:
+      watchdog =
+        values.3.status?.repository == values.0.repository.fullName ? values.3 : .absent
+    case .absent, .invalid:
+      watchdog = values.3
+    }
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = [.sortedKeys]
