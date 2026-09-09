@@ -87,12 +87,51 @@ final class MobileDashboardTests: XCTestCase {
       codexUsage: codexUsage,
       oxAudit: .current(oxStatus)
     )
+    let watchdogStatus = AutomationWatchdogStatus(
+      schema: "moment.automation-watchdog.v1",
+      observedAt: activityDate,
+      state: .observing,
+      model: "Qwen3.5-27B-4bit",
+      confidenceThreshold: 0.8,
+      requiredObservations: 2,
+      repository: "timyeou1234/Moment",
+      workers: [
+        AutomationWatchdogWorker(
+          workerID: "worker-0",
+          issueNumber: 237,
+          leaseStatus: "running",
+          leaseAgeSeconds: 120,
+          leaseRemainingSeconds: 3_000,
+          runtimeAvailable: true,
+          runtimeAgeSeconds: 12,
+          phase: "pr_fast",
+          role: "validator",
+          process: AutomationWatchdogProcess(
+            rootPresent: true,
+            descendantCount: 4,
+            maxCPUPercent: 98.4,
+            activityKind: "compiler",
+            activity: "working"
+          ),
+          modelAvailable: true,
+          decision: AutomationWatchdogDecision(
+            action: .observe,
+            confidence: 0.96,
+            streak: 0,
+            requiredStreak: 2,
+            decidedAt: activityDate,
+            summary: "Active compilation is plausible progress."
+          )
+        )
+      ]
+    )
+    store.updateWatchdog(.current(watchdogStatus))
 
     let data = try store.encodedSnapshot(servedAt: fixedDate("2026-08-22T07:00:01Z"))
     let decoded = try JSONDecoder.mobileDashboard.decode(MobileDashboardEnvelope.self, from: data)
     let rendered = String(decoding: data, as: UTF8.self)
 
-    XCTAssertEqual(decoded.schemaVersion, 6)
+    XCTAssertEqual(decoded.schemaVersion, 7)
     XCTAssertEqual(decoded.repository, "timyeou1234/Moment")
     XCTAssertEqual(decoded.runtime.phase, .solReview)
     XCTAssertEqual(decoded.runtime.activeStage, .review)
@@ -110,6 +149,9 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertEqual(decoded.oxAudit.completedCount, 3)
     XCTAssertEqual(decoded.oxAudit.totalCount, 21)
     XCTAssertEqual(decoded.oxAudit.lastHTTPStatus, 503)
+    XCTAssertEqual(decoded.watchdog.state, .observing)
+    XCTAssertEqual(decoded.watchdog.workers.first?.process.activityKind, "compiler")
+    XCTAssertEqual(decoded.watchdog.workers.first?.decision?.action, .observe)
     XCTAssertEqual(decoded.lanes.first?.items.first?.issueNumber, 237)
     XCTAssertEqual(
       decoded.lanes.first?.items.first?.automationDurationMilliseconds, 3_601_000)
@@ -142,6 +184,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(html.contains("READ ONLY"))
     XCTAssertTrue(html.contains("CODEX CAPACITY"))
     XCTAssertTrue(html.contains("OX FREE ISSUE SWEEP"))
+    XCTAssertTrue(html.contains("ACTIVE AUTO WATCHDOG"))
     XCTAssertTrue(html.contains("id=\"refresh-button\""))
     XCTAssertTrue(html.contains("id=\"last-update-time\""))
     XCTAssertTrue(html.contains("id=\"runtime-activity\""))
@@ -150,6 +193,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("/api/v1/snapshot"))
     XCTAssertTrue(javascript.contains("renderCodexUsage"))
     XCTAssertTrue(javascript.contains("renderOxAudit"))
+    XCTAssertTrue(javascript.contains("renderWatchdog"))
     XCTAssertTrue(javascript.contains("usage?.availability === \"stale\""))
     XCTAssertTrue(javascript.contains("renderStrategy"))
     XCTAssertTrue(javascript.contains("renderActivity"))
@@ -157,7 +201,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("latestDataUpdate"))
     XCTAssertTrue(javascript.contains("poll({ manual: true })"))
     XCTAssertTrue(javascript.contains("const stageOrder = [0, 1, 2, 3, 4]"))
-    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 6"))
+    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 7"))
     XCTAssertTrue(javascript.contains("rolloverCurrent"))
     XCTAssertTrue(
       javascript.contains("GitHub running · exact matching ProductDev runtime details unavailable"))

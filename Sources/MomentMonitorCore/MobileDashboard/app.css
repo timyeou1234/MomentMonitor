@@ -479,6 +479,19 @@ main { display: grid; gap: 14px; }
 
 .runtime-message { margin: 12px 0 0; color: #ffd4ab; font-size: 12px; line-height: 1.4; }
 
+.watchdog-card { padding: 18px; }
+.watchdog-workers { display: grid; gap: 8px; margin-top: 12px; }
+.watchdog-worker {
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  background: rgba(8,7,13,0.16);
+}
+.watchdog-worker strong { font-size: 11px; }
+.watchdog-worker p { margin: 4px 0 0; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.watchdog-decision.unblock,
+.watchdog-decision.takeover { color: var(--orange); }
+
 .work-section { padding: 20px; background: rgba(24, 22, 34, 0.82); }
 .repository-name { max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lanes { display: grid; gap: 12px; margin-top: 18px; }
@@ -543,6 +556,7 @@ footer div { display: flex; align-items: center; gap: 7px; }
   main { grid-template-columns: 0.86fr 1.14fr; }
   .progress-card { grid-column: 1; min-height: 100%; }
   .usage-card { grid-column: 1; }
+  .watchdog-card { grid-column: 1; }
   .runtime-card { grid-column: 2; grid-row: 1 / span 2; }
   .work-section { grid-column: 1 / -1; }
   .lanes { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }

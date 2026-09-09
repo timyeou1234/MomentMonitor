@@ -48,7 +48,7 @@ Safari，所以回到頁面時才會立即重新連線。連線暫時中斷時�
 
 頁首 **Refresh** 可立即重新向 Mac 讀取 snapshot，適合從背景回來或連線恢復後
 手動重試；它不會啟動 automation，也不會修改 GitHub、controller status 或 Codex。
-`Last update at` 顯示 GitHub snapshot、runtime telemetry、Ox audit 與 Codex usage 中最新的來源
+`Last update at` 顯示 GitHub snapshot、runtime telemetry、Ox audit、Active Auto watchdog 與 Codex usage 中最新的來源
 時間；頁尾 `Received …` 只表示手機最近成功收到 Mac 回應的時間。兩者刻意分開，
 避免把傳輸成功誤認為資料已改變。
 

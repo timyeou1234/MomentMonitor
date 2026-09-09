@@ -1,7 +1,7 @@
 import Foundation
 
 public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
-  public static let schemaVersion = 6
+  public static let schemaVersion = 7
 
   public let schemaVersion: Int
   public let repository: String
@@ -11,6 +11,7 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
   public let projectProgress: ProjectProgress
   public let codexUsage: MobileCodexUsageSummary
   public let oxAudit: MobileOxAuditSummary
+  public let watchdog: MobileAutomationWatchdogSummary
   public let runtime: MobileRuntimeSummary
   public let lanes: [MobileDashboardLane]
 
@@ -18,6 +19,7 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
     snapshot: MomentMonitorSnapshot,
     codexUsage: CodexUsageObservation,
     oxAudit: OxAuditObservation = .absent,
+    watchdog: AutomationWatchdogObservation = .absent,
     servedAt: Date = Date()
   ) {
     self.schemaVersion = Self.schemaVersion
@@ -28,6 +30,7 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
     self.projectProgress = snapshot.projectProgress
     self.codexUsage = MobileCodexUsageSummary(observation: codexUsage, now: servedAt)
     self.oxAudit = MobileOxAuditSummary(observation: oxAudit)
+    self.watchdog = MobileAutomationWatchdogSummary(observation: watchdog)
     self.runtime = MobileRuntimeSummary(observation: snapshot.runtimeObservation, now: servedAt)
     self.lanes = MonitorLane.allCases
       .sorted { $0.sortOrder < $1.sortOrder }
@@ -46,6 +49,28 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
           }
         )
       }
+  }
+}
+
+public struct MobileAutomationWatchdogSummary: Codable, Equatable, Sendable {
+  public let availability: AutomationWatchdogAvailability
+  public let state: AutomationWatchdogState?
+  public let model: String?
+  public let observedAt: Date?
+  public let confidenceThreshold: Double?
+  public let requiredObservations: Int?
+  public let workers: [AutomationWatchdogWorker]
+  public let message: String?
+
+  public init(observation: AutomationWatchdogObservation) {
+    self.availability = observation.availability
+    self.state = observation.status?.state
+    self.model = observation.status?.model
+    self.observedAt = observation.status?.observedAt
+    self.confidenceThreshold = observation.status?.confidenceThreshold
+    self.requiredObservations = observation.status?.requiredObservations
+    self.workers = observation.status?.workers ?? []
+    self.message = observation.message
   }
 }
 
@@ -217,15 +242,18 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
   private var snapshot: MomentMonitorSnapshot
   private var codexUsage: CodexUsageObservation
   private var oxAudit: OxAuditObservation
+  private var watchdog: AutomationWatchdogObservation
 
   public init(
     snapshot: MomentMonitorSnapshot,
     codexUsage: CodexUsageObservation = .unavailable(message: "Not refreshed yet."),
-    oxAudit: OxAuditObservation = .absent
+    oxAudit: OxAuditObservation = .absent,
+    watchdog: AutomationWatchdogObservation = .absent
   ) {
     self.snapshot = snapshot
     self.codexUsage = codexUsage
     self.oxAudit = oxAudit
+    self.watchdog = watchdog
   }
 
   public func update(_ snapshot: MomentMonitorSnapshot) {
@@ -246,8 +274,16 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
     }
   }
 
+  public func updateWatchdog(_ watchdog: AutomationWatchdogObservation) {
+    self.lock.withLock {
+      self.watchdog = watchdog
+    }
+  }
+
   public func encodedSnapshot(servedAt: Date = Date()) throws -> Data {
-    let values = self.lock.withLock { (self.snapshot, self.codexUsage, self.oxAudit) }
+    let values = self.lock.withLock {
+      (self.snapshot, self.codexUsage, self.oxAudit, self.watchdog)
+    }
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = [.sortedKeys]
@@ -256,6 +292,7 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
         snapshot: values.0,
         codexUsage: values.1,
         oxAudit: values.2,
+        watchdog: values.3,
         servedAt: servedAt
       ))
   }

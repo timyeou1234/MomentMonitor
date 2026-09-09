@@ -23,6 +23,9 @@
     @Published private(set) var oxAudit: OxAuditObservation {
       didSet { self.mobileDashboardSnapshotStore.updateOxAudit(self.oxAudit) }
     }
+    @Published private(set) var watchdog: AutomationWatchdogObservation {
+      didSet { self.mobileDashboardSnapshotStore.updateWatchdog(self.watchdog) }
+    }
     @Published private(set) var developmentDiagnosis: DevelopmentDiagnosis?
     @Published private(set) var isCodexUsageRefreshing = false
     @Published private(set) var settingsFeedback: String?
@@ -40,10 +43,12 @@
     private var runtimePollingTask: Task<Void, Never>?
     private var codexUsagePollingTask: Task<Void, Never>?
     private var oxAuditPollingTask: Task<Void, Never>?
+    private var watchdogPollingTask: Task<Void, Never>?
     private var developmentObservationTask: Task<Void, Never>?
     private var pendingDevelopmentFingerprint: String?
     private var codexUsageClient: CodexUsageClient?
     private let oxAuditReader = OxAuditStatusReader.live()
+    private let watchdogReader = AutomationWatchdogStatusReader.live()
     private let developmentObserver = DevelopmentObserver.live()
     private let defaults: UserDefaults
     private let mobileDashboardSnapshotStore: MobileDashboardSnapshotStore
@@ -79,11 +84,13 @@
       self.snapshot = initialSnapshot
       self.codexUsage = initialCodexUsage
       self.oxAudit = .absent
+      self.watchdog = .absent
       self.developmentDiagnosis = nil
       self.mobileDashboardSnapshotStore = MobileDashboardSnapshotStore(
         snapshot: initialSnapshot,
         codexUsage: initialCodexUsage,
-        oxAudit: .absent
+        oxAudit: .absent,
+        watchdog: .absent
       )
 
       Self.logger.info(
@@ -94,6 +101,7 @@
       self.startRuntimePolling()
       self.startCodexUsagePolling()
       self.startOxAuditPolling()
+      self.startWatchdogPolling()
       self.restartMobileDashboard()
       Task { await self.refreshAll() }
     }
@@ -210,10 +218,15 @@
       await self.refresh()
       await self.refreshCodexUsage()
       await self.refreshOxAudit()
+      await self.refreshWatchdog()
     }
 
     func refreshOxAudit() async {
       self.oxAudit = await self.oxAuditReader.read()
+    }
+
+    func refreshWatchdog() async {
+      self.watchdog = await self.watchdogReader.read()
     }
 
     func refreshCodexUsage() async {
@@ -359,6 +372,17 @@
           guard let self else { return }
           await self.refreshOxAudit()
           try? await Task.sleep(for: .seconds(1))
+        }
+      }
+    }
+
+    private func startWatchdogPolling() {
+      self.watchdogPollingTask?.cancel()
+      self.watchdogPollingTask = Task { [weak self] in
+        while !Task.isCancelled {
+          guard let self else { return }
+          await self.refreshWatchdog()
+          try? await Task.sleep(for: .seconds(2))
         }
       }
     }

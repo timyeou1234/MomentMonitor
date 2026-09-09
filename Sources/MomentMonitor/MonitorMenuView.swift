@@ -41,6 +41,10 @@
           AutomationRuntimeView(observation: self.store.snapshot.runtimeObservation)
           Divider()
         }
+        if self.store.watchdog.availability != .absent {
+          AutomationWatchdogView(observation: self.store.watchdog)
+          Divider()
+        }
 
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 14) {

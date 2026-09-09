@@ -88,7 +88,8 @@ function latestDataUpdate(snapshot) {
     snapshot.runtime?.updatedAt,
     snapshot.runtime?.activity?.observedAt,
     snapshot.codexUsage?.fetchedAt,
-    snapshot.oxAudit?.updatedAt
+    snapshot.oxAudit?.updatedAt,
+    snapshot.watchdog?.observedAt
   ]
     .filter(Boolean)
     .map((value) => new Date(value))
@@ -377,6 +378,61 @@ function renderOxAudit(ox, now) {
   message.hidden = !ox.message;
 }
 
+function watchdogStateTitle(value) {
+  switch (value) {
+    case "idle": return "Idle";
+    case "observing": return "Observing active Auto";
+    case "suspected_stall": return "Checking possible stall";
+    case "unblocking": return "Recovery admitted";
+    case "takeover": return "Repair lane taking over";
+    case "unavailable": return "Observer unavailable";
+    default: return "Observer status unavailable";
+  }
+}
+
+function renderWatchdog(watchdog, now) {
+  const card = byID("watchdog-card");
+  card.hidden = !watchdog || watchdog.availability === "absent";
+  if (card.hidden) return;
+  setText("watchdog-heading", watchdogStateTitle(watchdog.state));
+  const badge = byID("watchdog-badge");
+  const danger = watchdog.availability === "invalid" || watchdog.state === "unavailable";
+  const warning = watchdog.availability === "stale"
+    || ["suspected_stall", "unblocking", "takeover"].includes(watchdog.state);
+  badge.textContent = watchdog.availability === "stale"
+    ? "STALE"
+    : danger ? "INVALID" : watchdog.state === "idle" ? "IDLE" : "LIVE";
+  badge.className = `status-badge ${danger ? "status-danger" : warning ? "status-warning" : "status-live"}`;
+  const threshold = Number.isFinite(watchdog.confidenceThreshold)
+    ? `${Math.round(watchdog.confidenceThreshold * 100)}%`
+    : "—";
+  setText(
+    "watchdog-policy",
+    `${watchdog.model || "Local model unavailable"} · ${watchdog.requiredObservations || "—"} matching observations · confidence ≥ ${threshold} · ${relativeTime(watchdog.observedAt, now)}`
+  );
+  const workers = byID("watchdog-workers");
+  workers.replaceChildren();
+  (watchdog.workers || []).forEach((worker) => {
+    const row = document.createElement("article");
+    row.className = "watchdog-worker";
+    const title = document.createElement("strong");
+    title.textContent = `Issue #${worker.issueNumber} · ${worker.phase} · ${worker.role}`;
+    const activity = document.createElement("p");
+    activity.textContent = `${worker.workerID} · ${worker.process.activityKind} ${worker.process.activity} · ${worker.modelAvailable ? "oMLX online" : "oMLX unavailable"}`;
+    row.append(title, activity);
+    if (worker.decision) {
+      const decision = document.createElement("p");
+      decision.className = `watchdog-decision ${worker.decision.action}`;
+      decision.textContent = `${worker.decision.summary} ${Math.round(worker.decision.confidence * 100)}% · ${worker.decision.streak}/${worker.decision.requiredStreak}`;
+      row.append(decision);
+    }
+    workers.append(row);
+  });
+  const message = byID("watchdog-message");
+  message.textContent = watchdog.message || "";
+  message.hidden = !watchdog.message;
+}
+
 function createWorkItem(item, now) {
   const link = document.createElement("a");
   link.className = `work-item item-${item.severity}`;
@@ -497,6 +553,7 @@ function render() {
 
   renderCodexUsage(snapshot.codexUsage);
   renderOxAudit(snapshot.oxAudit, now);
+  renderWatchdog(snapshot.watchdog, now);
   const runningLane = snapshot.lanes.find((lane) => lane.lane === "running");
   const runningItem = runningLane?.items?.find((item) => item.issueNumber !== snapshot.runtime.issueNumber);
   const rolloverCurrent = snapshot.runtime.availability === "terminal" ? runningItem : null;
@@ -515,7 +572,7 @@ async function poll({ manual = false } = {}) {
     const response = await fetch("/api/v1/snapshot", { cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error(`Snapshot request failed: ${response.status}`);
     const snapshot = await response.json();
-    if (snapshot.schemaVersion !== 6) throw new Error("Unsupported snapshot schema");
+    if (snapshot.schemaVersion !== 7) throw new Error("Unsupported snapshot schema");
     state.snapshot = snapshot;
     state.connected = true;
     state.lastSuccess = new Date(snapshot.servedAt);
