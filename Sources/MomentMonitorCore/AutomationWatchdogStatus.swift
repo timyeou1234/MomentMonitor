@@ -243,7 +243,7 @@ public struct AutomationWatchdogStatusReader: Sendable {
         worker.issueNumber > 0,
         ["running", "continuing"].contains(worker.leaseStatus),
         worker.leaseAgeSeconds >= 0,
-        abs(worker.leaseRemainingSeconds) <= 7 * 24 * 60 * 60,
+        (-7 * 24 * 60 * 60...7 * 24 * 60 * 60).contains(worker.leaseRemainingSeconds),
         worker.runtimeAgeSeconds.map({ $0 >= 0 }) ?? true,
         isBoundedRuntimeLabel(worker.phase), isBoundedRuntimeLabel(worker.role),
         worker.process.descendantCount >= 0,
@@ -252,6 +252,7 @@ public struct AutomationWatchdogStatusReader: Sendable {
           worker.process.activityKind),
         ["absent", "waiting", "working"].contains(worker.process.activity),
         let process = object["process"] as? [String: Any], Set(process.keys) == processKeys,
+        processFieldsAreCoherent(worker.process),
         worker.modelAvailable == (worker.decision != nil),
         runtimeFieldsAreCoherent(worker)
       else { throw AutomationWatchdogReadError.invalidWorker }
@@ -290,6 +291,15 @@ public struct AutomationWatchdogStatusReader: Sendable {
       && worker.phase == "unavailable" && worker.role == "unavailable"
   }
 
+  private static func processFieldsAreCoherent(_ process: AutomationWatchdogProcess) -> Bool {
+    if process.activity == "absent" {
+      return !process.rootPresent && process.descendantCount == 0
+        && process.maxCPUPercent == 0 && process.activityKind == "none"
+    }
+    return process.activityKind != "none"
+      && (process.rootPresent || process.descendantCount > 0)
+  }
+
   private static func stateIsCoherent(_ status: AutomationWatchdogStatus) -> Bool {
     let decisions = status.workers.compactMap(\.decision)
     let admitted = decisions.filter {
@@ -300,7 +310,8 @@ public struct AutomationWatchdogStatusReader: Sendable {
     case .idle:
       return status.workers.isEmpty
     case .observing:
-      return !status.workers.isEmpty && decisions.allSatisfy { $0.action == .observe }
+      return !status.workers.isEmpty && !decisions.isEmpty
+        && decisions.allSatisfy { $0.action == .observe }
     case .suspectedStall:
       return !status.workers.isEmpty && admitted.isEmpty
         && decisions.contains { [.unblock, .takeover].contains($0.action) }

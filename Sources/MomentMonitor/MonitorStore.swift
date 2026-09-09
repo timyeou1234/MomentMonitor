@@ -12,7 +12,12 @@
       category: "MobileDashboard"
     )
     @Published private(set) var snapshot: MomentMonitorSnapshot {
-      didSet { self.mobileDashboardSnapshotStore.update(self.snapshot) }
+      didSet {
+        self.mobileDashboardSnapshotStore.update(self.snapshot)
+        if oldValue.repository != self.snapshot.repository {
+          self.watchdog = .absent
+        }
+      }
     }
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastError: String?
@@ -226,11 +231,7 @@
     }
 
     func refreshWatchdog() async {
-      guard let repository = try? RepositoryCoordinate(parsing: self.repositoryText) else {
-        self.watchdog = .absent
-        return
-      }
-      self.watchdog = await self.watchdogReader.read(repository: repository)
+      self.watchdog = await self.watchdogReader.read(repository: self.snapshot.repository)
     }
 
     func refreshCodexUsage() async {

@@ -330,6 +330,8 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
     let values = self.lock.withLock {
       (self.snapshot, self.codexUsage, self.oxAudit, self.watchdog)
     }
+    let watchdog =
+      values.3.status?.repository == values.0.repository.fullName ? values.3 : .absent
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = [.sortedKeys]
@@ -338,7 +340,7 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
         snapshot: values.0,
         codexUsage: values.1,
         oxAudit: values.2,
-        watchdog: values.3,
+        watchdog: watchdog,
         servedAt: servedAt
       ))
   }

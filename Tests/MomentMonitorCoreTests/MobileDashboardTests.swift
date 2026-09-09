@@ -217,6 +217,23 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("renderCodexUsage"))
     XCTAssertTrue(javascript.contains("renderOxAudit"))
     XCTAssertTrue(javascript.contains("renderWatchdog"))
+    for camelCaseField in [
+      "watchdog.confidenceThreshold", "watchdog.requiredObservations",
+      "watchdog.observedAt", "worker.workerID", "worker.issueNumber",
+      "worker.modelAvailable", "worker.process.activityKind", "worker.decision.requiredStreak",
+    ] {
+      XCTAssertTrue(javascript.contains(camelCaseField), "Missing renderer field \(camelCaseField)")
+    }
+    for snakeCaseField in [
+      "watchdog.confidence_threshold", "watchdog.required_observations",
+      "watchdog.observed_at", "worker.worker_id", "worker.issue_number",
+      "worker.model_available", "worker.process.activity_kind", "worker.decision.required_streak",
+    ] {
+      XCTAssertFalse(
+        javascript.contains(snakeCaseField),
+        "Unexpected renderer field \(snakeCaseField)"
+      )
+    }
     XCTAssertTrue(javascript.contains("usage?.availability === \"stale\""))
     XCTAssertTrue(javascript.contains("renderStrategy"))
     XCTAssertTrue(javascript.contains("renderActivity"))
@@ -266,6 +283,30 @@ final class MobileDashboardTests: XCTestCase {
       envelope.codexUsage.message,
       "Codex capacity has not refreshed recently."
     )
+  }
+
+  func testEnvelopeDropsWatchdogForAnotherSnapshotRepository() throws {
+    let status = AutomationWatchdogStatus(
+      schema: "moment.automation-watchdog.v1",
+      observedAt: fixedDate("2026-09-09T13:31:33Z"),
+      state: .idle,
+      model: "Qwen3.5-27B-4bit",
+      confidenceThreshold: 0.8,
+      requiredObservations: 2,
+      repository: "example/Elsewhere",
+      workers: []
+    )
+    let store = MobileDashboardSnapshotStore(
+      snapshot: .empty(repository: .moment),
+      watchdog: .current(status)
+    )
+
+    let data = try store.encodedSnapshot()
+    let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let watchdog = try XCTUnwrap(raw["watchdog"] as? [String: Any])
+
+    XCTAssertEqual(watchdog["availability"] as? String, "absent")
+    XCTAssertEqual(Set(watchdog.keys), ["availability", "workers"])
   }
 
   #if os(macOS)

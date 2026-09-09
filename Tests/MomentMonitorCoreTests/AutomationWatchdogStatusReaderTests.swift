@@ -96,6 +96,22 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
     XCTAssertEqual(observation.availability, .invalid)
   }
 
+  func testRejectsMinimumLeaseRemainingWithoutTrapping() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    workers[0]["lease_remaining_seconds"] = Int.min
+    fixture["workers"] = workers
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
   func testRejectsDuplicateWorkerIDs() async throws {
     var fixture = Self.fixture()
     var workers = fixture["workers"] as! [[String: Any]]
@@ -165,6 +181,41 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
   func testRejectsStateThatContradictsWorkerDecisions() async throws {
     var fixture = Self.fixture()
     fixture["state"] = "idle"
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsObservingStateWhenEveryModelIsUnavailable() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    workers[0]["model_available"] = false
+    workers[0].removeValue(forKey: "decision")
+    fixture["workers"] = workers
+    try self.write(fixture)
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid()
+    )
+
+    let observation = await reader.read(repository: .moment)
+
+    XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsContradictoryProcessActivity() async throws {
+    var fixture = Self.fixture()
+    var workers = fixture["workers"] as! [[String: Any]]
+    var process = workers[0]["process"] as! [String: Any]
+    process["activity"] = "absent"
+    workers[0]["process"] = process
+    fixture["workers"] = workers
     try self.write(fixture)
     let reader = AutomationWatchdogStatusReader(
       fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
