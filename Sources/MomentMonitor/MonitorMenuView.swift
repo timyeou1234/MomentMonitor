@@ -100,7 +100,7 @@
         VStack(alignment: .leading, spacing: 2) {
           Text("Moments Automation")
             .font(.headline)
-          Text(self.store.repositoryText)
+          Text(self.store.appliedRepositoryText)
             .font(.caption)
             .foregroundStyle(.secondary)
         }

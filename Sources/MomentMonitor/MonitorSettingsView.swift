@@ -7,9 +7,9 @@
     var body: some View {
       Form {
         Section("Repository") {
-          TextField("owner/name", text: self.$store.repositoryText)
+          TextField("owner/name", text: self.$store.repositoryDraftText)
             .textFieldStyle(.roundedBorder)
-            .onChange(of: self.store.repositoryText) {
+            .onChange(of: self.store.repositoryDraftText) {
               self.store.clearSettingsFeedback()
             }
           if let validationMessage = self.store.repositoryValidationMessage {

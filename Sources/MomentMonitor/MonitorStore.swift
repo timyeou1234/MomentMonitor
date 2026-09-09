@@ -35,7 +35,7 @@
     @Published private(set) var isCodexUsageRefreshing = false
     @Published private(set) var settingsFeedback: String?
     @Published private(set) var settingsFeedbackIsError = false
-    @Published var repositoryText: String
+    @Published var repositoryDraftText: String
     @Published var refreshIntervalSeconds: Int
     @Published var completedItemLimit: Int
     @Published var localModelObserverEnabled: Bool
@@ -80,7 +80,7 @@
       let configuredRepository = RepositoryCoordinate.resolvingPersisted(
         defaults.string(forKey: "repository")
       )
-      self.repositoryText = configuredRepository.fullName
+      self.repositoryDraftText = configuredRepository.fullName
       self.configuredRepository = configuredRepository
       self.refreshIntervalSeconds = defaults.object(forKey: "refreshIntervalSeconds") as? Int ?? 30
       self.completedItemLimit = defaults.object(forKey: "completedItemLimit") as? Int ?? 8
@@ -158,7 +158,7 @@
 
     var repositoryValidationMessage: String? {
       do {
-        _ = try RepositoryCoordinate(parsing: self.repositoryText)
+        _ = try RepositoryCoordinate(parsing: self.repositoryDraftText)
         return nil
       } catch {
         return error.localizedDescription
@@ -191,6 +191,10 @@
 
     var tailscaleServeCommand: String {
       "tailscale serve --bg http://127.0.0.1:\(self.mobileDashboardPort)"
+    }
+
+    var appliedRepositoryText: String {
+      self.configuredRepository.fullName
     }
 
     func refresh() async {
@@ -295,7 +299,7 @@
         return
       }
 
-      self.repositoryText = configuration.repository.fullName
+      self.repositoryDraftText = configuration.repository.fullName
       self.refreshIntervalSeconds = min(max(15, self.refreshIntervalSeconds), 300)
       self.completedItemLimit = min(max(1, self.completedItemLimit), 30)
       guard self.mobileDashboardValidationMessage == nil else {
@@ -315,7 +319,7 @@
         self.hasSuccessfulRefresh = false
         self.lastError = nil
       }
-      self.defaults.set(self.repositoryText, forKey: "repository")
+      self.defaults.set(self.configuredRepository.fullName, forKey: "repository")
       self.defaults.set(self.refreshIntervalSeconds, forKey: "refreshIntervalSeconds")
       self.defaults.set(self.completedItemLimit, forKey: "completedItemLimit")
       self.defaults.set(self.localModelObserverEnabled, forKey: "localModelObserverEnabled")
@@ -342,8 +346,7 @@
     }
 
     func openRepository() {
-      guard let coordinate = try? RepositoryCoordinate(parsing: self.repositoryText),
-        let url = URL(string: "https://github.com/\(coordinate.fullName)")
+      guard let url = URL(string: "https://github.com/\(self.configuredRepository.fullName)")
       else { return }
       NSWorkspace.shared.open(url)
     }
@@ -370,7 +373,7 @@
 
     private func draftConfiguration() throws -> MonitorConfiguration {
       MonitorConfiguration(
-        repository: try RepositoryCoordinate(parsing: self.repositoryText),
+        repository: try RepositoryCoordinate(parsing: self.repositoryDraftText),
         refreshIntervalSeconds: TimeInterval(self.refreshIntervalSeconds),
         completedItemLimit: self.completedItemLimit
       )
