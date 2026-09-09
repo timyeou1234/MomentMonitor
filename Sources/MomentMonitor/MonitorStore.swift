@@ -12,7 +12,12 @@
       category: "MobileDashboard"
     )
     @Published private(set) var snapshot: MomentMonitorSnapshot {
-      didSet { self.mobileDashboardSnapshotStore.update(self.snapshot) }
+      didSet {
+        self.mobileDashboardSnapshotStore.update(self.snapshot)
+        if oldValue.repository != self.snapshot.repository {
+          self.watchdog = .absent
+        }
+      }
     }
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastError: String?
@@ -23,11 +28,14 @@
     @Published private(set) var oxAudit: OxAuditObservation {
       didSet { self.mobileDashboardSnapshotStore.updateOxAudit(self.oxAudit) }
     }
+    @Published private(set) var watchdog: AutomationWatchdogObservation {
+      didSet { self.mobileDashboardSnapshotStore.updateWatchdog(self.watchdog) }
+    }
     @Published private(set) var developmentDiagnosis: DevelopmentDiagnosis?
     @Published private(set) var isCodexUsageRefreshing = false
     @Published private(set) var settingsFeedback: String?
     @Published private(set) var settingsFeedbackIsError = false
-    @Published var repositoryText: String
+    @Published var repositoryDraftText: String
     @Published var refreshIntervalSeconds: Int
     @Published var completedItemLimit: Int
     @Published var localModelObserverEnabled: Bool
@@ -40,10 +48,15 @@
     private var runtimePollingTask: Task<Void, Never>?
     private var codexUsagePollingTask: Task<Void, Never>?
     private var oxAuditPollingTask: Task<Void, Never>?
+    private var watchdogPollingTask: Task<Void, Never>?
     private var developmentObservationTask: Task<Void, Never>?
     private var pendingDevelopmentFingerprint: String?
+    private var configuredRepository: RepositoryCoordinate
+    private var repositoryGeneration = 0
+    private var latestRefreshID = 0
     private var codexUsageClient: CodexUsageClient?
     private let oxAuditReader = OxAuditStatusReader.live()
+    private let watchdogReader = AutomationWatchdogStatusReader.live()
     private let developmentObserver = DevelopmentObserver.live()
     private let defaults: UserDefaults
     private let mobileDashboardSnapshotStore: MobileDashboardSnapshotStore
@@ -64,8 +77,11 @@
 
     init(defaults: UserDefaults = .standard) {
       self.defaults = defaults
-      self.repositoryText =
-        defaults.string(forKey: "repository") ?? RepositoryCoordinate.moment.fullName
+      let configuredRepository = RepositoryCoordinate.resolvingPersisted(
+        defaults.string(forKey: "repository")
+      )
+      self.repositoryDraftText = configuredRepository.fullName
+      self.configuredRepository = configuredRepository
       self.refreshIntervalSeconds = defaults.object(forKey: "refreshIntervalSeconds") as? Int ?? 30
       self.completedItemLimit = defaults.object(forKey: "completedItemLimit") as? Int ?? 8
       self.localModelObserverEnabled =
@@ -74,16 +90,18 @@
       self.mobileDashboardPort =
         defaults.object(forKey: "mobileDashboardPort") as? Int
         ?? MobileDashboardServer.defaultPort
-      let initialSnapshot = MomentMonitorSnapshot.empty(repository: .moment)
+      let initialSnapshot = MomentMonitorSnapshot.empty(repository: configuredRepository)
       let initialCodexUsage = CodexUsageObservation.unavailable(message: "Not refreshed yet.")
       self.snapshot = initialSnapshot
       self.codexUsage = initialCodexUsage
       self.oxAudit = .absent
+      self.watchdog = .absent
       self.developmentDiagnosis = nil
       self.mobileDashboardSnapshotStore = MobileDashboardSnapshotStore(
         snapshot: initialSnapshot,
         codexUsage: initialCodexUsage,
-        oxAudit: .absent
+        oxAudit: .absent,
+        watchdog: .absent
       )
 
       Self.logger.info(
@@ -94,6 +112,7 @@
       self.startRuntimePolling()
       self.startCodexUsagePolling()
       self.startOxAuditPolling()
+      self.startWatchdogPolling()
       self.restartMobileDashboard()
       Task { await self.refreshAll() }
     }
@@ -139,7 +158,7 @@
 
     var repositoryValidationMessage: String? {
       do {
-        _ = try RepositoryCoordinate(parsing: self.repositoryText)
+        _ = try RepositoryCoordinate(parsing: self.repositoryDraftText)
         return nil
       } catch {
         return error.localizedDescription
@@ -174,10 +193,20 @@
       "tailscale serve --bg http://127.0.0.1:\(self.mobileDashboardPort)"
     }
 
+    var appliedRepositoryText: String {
+      self.configuredRepository.fullName
+    }
+
     func refresh() async {
-      guard !self.isRefreshing else { return }
+      self.latestRefreshID += 1
+      let refreshID = self.latestRefreshID
+      let repositoryGeneration = self.repositoryGeneration
       self.isRefreshing = true
-      defer { self.isRefreshing = false }
+      defer {
+        if self.latestRefreshID == refreshID {
+          self.isRefreshing = false
+        }
+      }
 
       do {
         let configuration = try self.configuration()
@@ -192,13 +221,22 @@
         }
 
         let refreshed = try await service.refresh(configuration: configuration)
+        guard self.latestRefreshID == refreshID,
+          self.repositoryGeneration == repositoryGeneration
+        else { return }
         self.snapshot = refreshed
         self.scheduleDevelopmentObservation(for: refreshed)
         self.hasSuccessfulRefresh = true
         self.lastError = nil
       } catch {
+        guard self.latestRefreshID == refreshID,
+          self.repositoryGeneration == repositoryGeneration
+        else { return }
         if let service = self.service, let configuration = try? self.configuration() {
           let runtimeObservation = await service.readRuntimeStatus(configuration: configuration)
+          guard self.latestRefreshID == refreshID,
+            self.repositoryGeneration == repositoryGeneration
+          else { return }
           self.snapshot = self.snapshot.replacingRuntimeObservation(runtimeObservation)
           self.scheduleDevelopmentObservation(for: self.snapshot)
         }
@@ -210,10 +248,21 @@
       await self.refresh()
       await self.refreshCodexUsage()
       await self.refreshOxAudit()
+      await self.refreshWatchdog()
     }
 
     func refreshOxAudit() async {
       self.oxAudit = await self.oxAuditReader.read()
+    }
+
+    func refreshWatchdog() async {
+      let repository = self.configuredRepository
+      let repositoryGeneration = self.repositoryGeneration
+      let observation = await self.watchdogReader.read(repository: repository)
+      guard self.repositoryGeneration == repositoryGeneration,
+        self.configuredRepository == repository
+      else { return }
+      self.watchdog = observation
     }
 
     func refreshCodexUsage() async {
@@ -243,14 +292,14 @@
     func applyPreferences() async {
       let configuration: MonitorConfiguration
       do {
-        configuration = try self.configuration()
+        configuration = try self.draftConfiguration()
       } catch {
         self.settingsFeedback = error.localizedDescription
         self.settingsFeedbackIsError = true
         return
       }
 
-      self.repositoryText = configuration.repository.fullName
+      self.repositoryDraftText = configuration.repository.fullName
       self.refreshIntervalSeconds = min(max(15, self.refreshIntervalSeconds), 300)
       self.completedItemLimit = min(max(1, self.completedItemLimit), 30)
       guard self.mobileDashboardValidationMessage == nil else {
@@ -258,7 +307,19 @@
         self.settingsFeedbackIsError = true
         return
       }
-      self.defaults.set(self.repositoryText, forKey: "repository")
+      let repositoryChanged =
+        self.configuredRepository.fullName.caseInsensitiveCompare(
+          configuration.repository.fullName
+        ) != .orderedSame
+      self.configuredRepository = configuration.repository
+      self.repositoryGeneration += 1
+      self.watchdog = .absent
+      if repositoryChanged {
+        self.snapshot = .empty(repository: configuration.repository)
+        self.hasSuccessfulRefresh = false
+        self.lastError = nil
+      }
+      self.defaults.set(self.configuredRepository.fullName, forKey: "repository")
       self.defaults.set(self.refreshIntervalSeconds, forKey: "refreshIntervalSeconds")
       self.defaults.set(self.completedItemLimit, forKey: "completedItemLimit")
       self.defaults.set(self.localModelObserverEnabled, forKey: "localModelObserverEnabled")
@@ -285,8 +346,7 @@
     }
 
     func openRepository() {
-      guard let coordinate = try? RepositoryCoordinate(parsing: self.repositoryText),
-        let url = URL(string: "https://github.com/\(coordinate.fullName)")
+      guard let url = URL(string: "https://github.com/\(self.configuredRepository.fullName)")
       else { return }
       NSWorkspace.shared.open(url)
     }
@@ -305,7 +365,15 @@
 
     private func configuration() throws -> MonitorConfiguration {
       MonitorConfiguration(
-        repository: try RepositoryCoordinate(parsing: self.repositoryText),
+        repository: self.configuredRepository,
+        refreshIntervalSeconds: TimeInterval(self.refreshIntervalSeconds),
+        completedItemLimit: self.completedItemLimit
+      )
+    }
+
+    private func draftConfiguration() throws -> MonitorConfiguration {
+      MonitorConfiguration(
+        repository: try RepositoryCoordinate(parsing: self.repositoryDraftText),
         refreshIntervalSeconds: TimeInterval(self.refreshIntervalSeconds),
         completedItemLimit: self.completedItemLimit
       )
@@ -332,7 +400,11 @@
           guard !Task.isCancelled, let service = self.service,
             let configuration = try? self.configuration()
           else { continue }
+          let repositoryGeneration = self.repositoryGeneration
           let observation = await service.readRuntimeStatus(configuration: configuration)
+          guard self.repositoryGeneration == repositoryGeneration,
+            self.configuredRepository == configuration.repository
+          else { continue }
           if observation != self.snapshot.runtimeObservation {
             self.snapshot = self.snapshot.replacingRuntimeObservation(observation)
             self.scheduleDevelopmentObservation(for: self.snapshot)
@@ -359,6 +431,17 @@
           guard let self else { return }
           await self.refreshOxAudit()
           try? await Task.sleep(for: .seconds(1))
+        }
+      }
+    }
+
+    private func startWatchdogPolling() {
+      self.watchdogPollingTask?.cancel()
+      self.watchdogPollingTask = Task { [weak self] in
+        while !Task.isCancelled {
+          guard let self else { return }
+          await self.refreshWatchdog()
+          try? await Task.sleep(for: .seconds(2))
         }
       }
     }

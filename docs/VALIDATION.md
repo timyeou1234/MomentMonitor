@@ -1,5 +1,25 @@
 # Validation
 
+## v0.7.0 Active Auto watchdog candidate
+
+Validated on macOS / Apple Silicon with the repository's full Swift and read-only gates:
+
+- owner-only, no-follow `moment.automation-watchdog.v1` reads are bound to the configured
+  repository; unrelated records are absent and malformed/coherence-invalid records fail closed;
+- the native menu card and loopback dashboard disclose only bounded observer state and fixed
+  decision summaries, never credentials, PID, SHA, prompt, response, finding or raw command data;
+- mobile schema v7 uses dedicated watchdog DTOs with exact camelCase JSON keys and omits lease
+  timing, raw process counts/CPU and decision timestamps;
+- raw-JSON tests bind the browser renderer to the camelCase contract and enforce the nested mobile
+  privacy allowlist;
+- Codex App Server `clientInfo.version` matches package version `0.7.0` while retaining the exact
+  read-only method allowlist;
+- GET/HEAD-only loopback transport, Host validation, security headers, strict formatting,
+  warnings-as-errors, packaging, signing, installation and live UI/runtime observations are recorded
+  by the final release verification for this candidate.
+
+Physical-iPhone and assistive-technology conformance remain unverified.
+
 ## v0.6.0 local development observer candidate
 
 Validated on macOS / Apple Silicon with 84 XCTest cases and 0 failures:

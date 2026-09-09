@@ -87,12 +87,57 @@ final class MobileDashboardTests: XCTestCase {
       codexUsage: codexUsage,
       oxAudit: .current(oxStatus)
     )
+    let watchdogStatus = AutomationWatchdogStatus(
+      schema: "moment.automation-watchdog.v1",
+      observedAt: activityDate,
+      state: .observing,
+      model: "Qwen3.5-27B-4bit",
+      confidenceThreshold: 0.8,
+      requiredObservations: 2,
+      repository: "timyeou1234/Moment",
+      workers: [
+        AutomationWatchdogWorker(
+          workerID: "worker-0",
+          issueNumber: 237,
+          leaseStatus: "running",
+          leaseAgeSeconds: 120,
+          leaseRemainingSeconds: 3_000,
+          runtimeAvailable: true,
+          runtimeAgeSeconds: 12,
+          phase: "pr_fast",
+          role: "validator",
+          process: AutomationWatchdogProcess(
+            rootPresent: true,
+            descendantCount: 4,
+            maxCPUPercent: 98.4,
+            activityKind: "compiler",
+            activity: "working"
+          ),
+          modelAvailable: true,
+          decision: AutomationWatchdogDecision(
+            action: .observe,
+            confidence: 0.96,
+            streak: 0,
+            requiredStreak: 2,
+            decidedAt: activityDate,
+            summary: "Local model found no actionable stall."
+          )
+        )
+      ]
+    )
+    store.updateWatchdog(.current(watchdogStatus))
 
     let data = try store.encodedSnapshot(servedAt: fixedDate("2026-08-22T07:00:01Z"))
     let decoded = try JSONDecoder.mobileDashboard.decode(MobileDashboardEnvelope.self, from: data)
     let rendered = String(decoding: data, as: UTF8.self)
+    let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let rawWatchdog = try XCTUnwrap(raw["watchdog"] as? [String: Any])
+    let rawWorkers = try XCTUnwrap(rawWatchdog["workers"] as? [[String: Any]])
+    let rawWorker = try XCTUnwrap(rawWorkers.first)
+    let rawProcess = try XCTUnwrap(rawWorker["process"] as? [String: Any])
+    let rawDecision = try XCTUnwrap(rawWorker["decision"] as? [String: Any])
 
-    XCTAssertEqual(decoded.schemaVersion, 6)
+    XCTAssertEqual(decoded.schemaVersion, 7)
     XCTAssertEqual(decoded.repository, "timyeou1234/Moment")
     XCTAssertEqual(decoded.runtime.phase, .solReview)
     XCTAssertEqual(decoded.runtime.activeStage, .review)
@@ -110,6 +155,25 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertEqual(decoded.oxAudit.completedCount, 3)
     XCTAssertEqual(decoded.oxAudit.totalCount, 21)
     XCTAssertEqual(decoded.oxAudit.lastHTTPStatus, 503)
+    XCTAssertEqual(decoded.watchdog.state, .observing)
+    XCTAssertEqual(decoded.watchdog.workers.first?.process.activityKind, "compiler")
+    XCTAssertEqual(decoded.watchdog.workers.first?.decision?.action, .observe)
+    XCTAssertEqual(
+      Set(rawWatchdog.keys),
+      [
+        "availability", "state", "model", "observedAt", "confidenceThreshold",
+        "requiredObservations", "workers",
+      ])
+    XCTAssertEqual(
+      Set(rawWorker.keys),
+      ["workerID", "issueNumber", "phase", "role", "process", "modelAvailable", "decision"])
+    XCTAssertEqual(Set(rawProcess.keys), ["activityKind", "activity"])
+    XCTAssertEqual(
+      Set(rawDecision.keys), ["action", "confidence", "streak", "requiredStreak", "summary"])
+    XCTAssertNil(rawWorker["lease_status"])
+    XCTAssertNil(rawWorker["leaseAgeSeconds"])
+    XCTAssertNil(rawProcess["rootPresent"])
+    XCTAssertNil(rawDecision["decidedAt"])
     XCTAssertEqual(decoded.lanes.first?.items.first?.issueNumber, 237)
     XCTAssertEqual(
       decoded.lanes.first?.items.first?.automationDurationMilliseconds, 3_601_000)
@@ -122,6 +186,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertFalse(rendered.contains("lifetimeTokens"))
     XCTAssertFalse(rendered.contains("prompt"))
     XCTAssertFalse(rendered.contains("response"))
+    XCTAssertFalse(rendered.contains("finding"))
 
     let oldActivityEnvelope = MobileDashboardEnvelope(
       snapshot: snapshot,
@@ -142,6 +207,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(html.contains("READ ONLY"))
     XCTAssertTrue(html.contains("CODEX CAPACITY"))
     XCTAssertTrue(html.contains("OX FREE ISSUE SWEEP"))
+    XCTAssertTrue(html.contains("ACTIVE AUTO WATCHDOG"))
     XCTAssertTrue(html.contains("id=\"refresh-button\""))
     XCTAssertTrue(html.contains("id=\"last-update-time\""))
     XCTAssertTrue(html.contains("id=\"runtime-activity\""))
@@ -150,6 +216,34 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("/api/v1/snapshot"))
     XCTAssertTrue(javascript.contains("renderCodexUsage"))
     XCTAssertTrue(javascript.contains("renderOxAudit"))
+    XCTAssertTrue(javascript.contains("renderWatchdog"))
+    XCTAssertTrue(javascript.contains(": unavailable ? \"UNAVAILABLE\""))
+    let watchdogRendererStart = try XCTUnwrap(javascript.range(of: "function renderWatchdog"))
+    let watchdogRendererEnd = try XCTUnwrap(
+      javascript.range(
+        of: "function createWorkItem", range: watchdogRendererStart.upperBound..<javascript.endIndex
+      )
+    )
+    let watchdogRenderer = javascript[
+      watchdogRendererStart.lowerBound..<watchdogRendererEnd.lowerBound]
+    XCTAssertFalse(watchdogRenderer.contains("danger ? \"INVALID\""))
+    for camelCaseField in [
+      "watchdog.confidenceThreshold", "watchdog.requiredObservations",
+      "watchdog.observedAt", "worker.workerID", "worker.issueNumber",
+      "worker.modelAvailable", "worker.process.activityKind", "worker.decision.requiredStreak",
+    ] {
+      XCTAssertTrue(javascript.contains(camelCaseField), "Missing renderer field \(camelCaseField)")
+    }
+    for snakeCaseField in [
+      "watchdog.confidence_threshold", "watchdog.required_observations",
+      "watchdog.observed_at", "worker.worker_id", "worker.issue_number",
+      "worker.model_available", "worker.process.activity_kind", "worker.decision.required_streak",
+    ] {
+      XCTAssertFalse(
+        javascript.contains(snakeCaseField),
+        "Unexpected renderer field \(snakeCaseField)"
+      )
+    }
     XCTAssertTrue(javascript.contains("usage?.availability === \"stale\""))
     XCTAssertTrue(javascript.contains("renderStrategy"))
     XCTAssertTrue(javascript.contains("renderActivity"))
@@ -157,7 +251,7 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertTrue(javascript.contains("latestDataUpdate"))
     XCTAssertTrue(javascript.contains("poll({ manual: true })"))
     XCTAssertTrue(javascript.contains("const stageOrder = [0, 1, 2, 3, 4]"))
-    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 6"))
+    XCTAssertTrue(javascript.contains("snapshot.schemaVersion !== 7"))
     XCTAssertTrue(javascript.contains("rolloverCurrent"))
     XCTAssertTrue(
       javascript.contains("GitHub running · exact matching ProductDev runtime details unavailable"))
@@ -199,6 +293,68 @@ final class MobileDashboardTests: XCTestCase {
       envelope.codexUsage.message,
       "Codex capacity has not refreshed recently."
     )
+  }
+
+  func testEnvelopeDropsWatchdogForAnotherSnapshotRepository() throws {
+    let status = AutomationWatchdogStatus(
+      schema: "moment.automation-watchdog.v1",
+      observedAt: fixedDate("2026-09-09T13:31:33Z"),
+      state: .idle,
+      model: "Qwen3.5-27B-4bit",
+      confidenceThreshold: 0.8,
+      requiredObservations: 2,
+      repository: "example/Elsewhere",
+      workers: []
+    )
+    let store = MobileDashboardSnapshotStore(
+      snapshot: .empty(repository: .moment),
+      watchdog: .current(status)
+    )
+
+    let data = try store.encodedSnapshot()
+    let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let watchdog = try XCTUnwrap(raw["watchdog"] as? [String: Any])
+
+    XCTAssertEqual(watchdog["availability"] as? String, "absent")
+    XCTAssertEqual(Set(watchdog.keys), ["availability", "workers"])
+  }
+
+  func testEnvelopePreservesWatchdogForMixedCaseSnapshotRepository() throws {
+    let status = AutomationWatchdogStatus(
+      schema: "moment.automation-watchdog.v1",
+      observedAt: fixedDate("2026-09-09T13:31:33Z"),
+      state: .idle,
+      model: "Qwen3.5-27B-4bit",
+      confidenceThreshold: 0.8,
+      requiredObservations: 2,
+      repository: "timyeou1234/Moment",
+      workers: []
+    )
+    let store = MobileDashboardSnapshotStore(
+      snapshot: .empty(repository: try RepositoryCoordinate(parsing: "TIMYEOU1234/moment")),
+      watchdog: .current(status)
+    )
+
+    let data = try store.encodedSnapshot()
+    let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let watchdog = try XCTUnwrap(raw["watchdog"] as? [String: Any])
+
+    XCTAssertEqual(watchdog["availability"] as? String, "current")
+  }
+
+  func testEnvelopePreservesInvalidWatchdogWithoutPublishingStatus() throws {
+    let store = MobileDashboardSnapshotStore(
+      snapshot: .empty(repository: .moment),
+      watchdog: .invalid("Active observer status is invalid.")
+    )
+
+    let data = try store.encodedSnapshot()
+    let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let watchdog = try XCTUnwrap(raw["watchdog"] as? [String: Any])
+
+    XCTAssertEqual(watchdog["availability"] as? String, "invalid")
+    XCTAssertEqual(watchdog["message"] as? String, "Active observer status is invalid.")
+    XCTAssertEqual(Set(watchdog.keys), ["availability", "message", "workers"])
   }
 
   #if os(macOS)

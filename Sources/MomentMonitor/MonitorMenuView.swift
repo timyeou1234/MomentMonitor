@@ -41,6 +41,10 @@
           AutomationRuntimeView(observation: self.store.snapshot.runtimeObservation)
           Divider()
         }
+        if self.store.watchdog.availability != .absent {
+          AutomationWatchdogView(observation: self.store.watchdog)
+          Divider()
+        }
 
         ScrollView {
           LazyVStack(alignment: .leading, spacing: 14) {
@@ -96,7 +100,7 @@
         VStack(alignment: .leading, spacing: 2) {
           Text("Moments Automation")
             .font(.headline)
-          Text(self.store.repositoryText)
+          Text(self.store.appliedRepositoryText)
             .font(.caption)
             .foregroundStyle(.secondary)
         }

@@ -73,9 +73,10 @@ repository sync
 ```text
 ~/Library/Application Support/MomentAutomation/runtime/current.json
 ~/Library/Application Support/MomentAutomation/runtime/ox-current.json
+~/Library/Application Support/MomentAutomationMaintenance/watchdog/current.json
 ```
 
-它不讀 Moment checkout、不掃 Codex JSONL，也不讀 prompt、response、finding、完整命令、路徑、raw token count 或 credential。即時活動與 Ox progress 只使用 producer 寫入的 allow-listed 類型、狀態、時間與計數。Viewer 不存在、無法讀取或刪除這些檔案時，Moment automation 與 Ox audit 必須完全不受影響。
+它不讀 Moment checkout、不掃 Codex JSONL，也不讀 prompt、response、finding、完整命令、路徑、raw token count 或 credential。即時活動、Ox progress 與 Active Auto watchdog 只使用 producer 寫入的 allow-listed 類型、狀態、時間與計數。Watchdog 顯示 oMLX 可用性、泛化 process 活性、決策信心與連續觀測門檻，但不顯示 PID、SHA、token、raw command 或模型原文。Viewer 不存在、無法讀取或刪除這些檔案時，Moment automation、maintenance 與 Ox audit 必須完全不受影響。
 
 手機 snapshot 不包含 controller run ID、PID、Git SHA、credential、prompt 或 response；也沒有 CORS、外部 script、持久化 browser cache 或 public hosting。tailnet 中獲准存取的裝置仍可看到 Issue 標題與目前工作狀態，因此應使用 Tailscale ACL 控制成員。詳細 contract 見 [`docs/READ_ONLY_BOUNDARY.md`](docs/READ_ONLY_BOUNDARY.md)。
 

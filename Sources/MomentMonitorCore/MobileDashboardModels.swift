@@ -1,7 +1,7 @@
 import Foundation
 
 public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
-  public static let schemaVersion = 6
+  public static let schemaVersion = 7
 
   public let schemaVersion: Int
   public let repository: String
@@ -11,6 +11,7 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
   public let projectProgress: ProjectProgress
   public let codexUsage: MobileCodexUsageSummary
   public let oxAudit: MobileOxAuditSummary
+  public let watchdog: MobileAutomationWatchdogSummary
   public let runtime: MobileRuntimeSummary
   public let lanes: [MobileDashboardLane]
 
@@ -18,6 +19,7 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
     snapshot: MomentMonitorSnapshot,
     codexUsage: CodexUsageObservation,
     oxAudit: OxAuditObservation = .absent,
+    watchdog: AutomationWatchdogObservation = .absent,
     servedAt: Date = Date()
   ) {
     self.schemaVersion = Self.schemaVersion
@@ -28,6 +30,7 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
     self.projectProgress = snapshot.projectProgress
     self.codexUsage = MobileCodexUsageSummary(observation: codexUsage, now: servedAt)
     self.oxAudit = MobileOxAuditSummary(observation: oxAudit)
+    self.watchdog = MobileAutomationWatchdogSummary(observation: watchdog)
     self.runtime = MobileRuntimeSummary(observation: snapshot.runtimeObservation, now: servedAt)
     self.lanes = MonitorLane.allCases
       .sorted { $0.sortOrder < $1.sortOrder }
@@ -46,6 +49,74 @@ public struct MobileDashboardEnvelope: Codable, Equatable, Sendable {
           }
         )
       }
+  }
+}
+
+public struct MobileAutomationWatchdogSummary: Codable, Equatable, Sendable {
+  public let availability: AutomationWatchdogAvailability
+  public let state: AutomationWatchdogState?
+  public let model: String?
+  public let observedAt: Date?
+  public let confidenceThreshold: Double?
+  public let requiredObservations: Int?
+  public let workers: [MobileAutomationWatchdogWorker]
+  public let message: String?
+
+  public init(observation: AutomationWatchdogObservation) {
+    self.availability = observation.availability
+    self.state = observation.status?.state
+    self.model = observation.status?.model
+    self.observedAt = observation.status?.observedAt
+    self.confidenceThreshold = observation.status?.confidenceThreshold
+    self.requiredObservations = observation.status?.requiredObservations
+    self.workers = observation.status?.workers.map(MobileAutomationWatchdogWorker.init) ?? []
+    self.message = observation.message
+  }
+}
+
+public struct MobileAutomationWatchdogWorker: Codable, Equatable, Sendable {
+  public let workerID: String
+  public let issueNumber: Int
+  public let phase: String
+  public let role: String
+  public let process: MobileAutomationWatchdogProcess
+  public let modelAvailable: Bool
+  public let decision: MobileAutomationWatchdogDecision?
+
+  public init(worker: AutomationWatchdogWorker) {
+    self.workerID = worker.workerID
+    self.issueNumber = worker.issueNumber
+    self.phase = worker.phase
+    self.role = worker.role
+    self.process = MobileAutomationWatchdogProcess(process: worker.process)
+    self.modelAvailable = worker.modelAvailable
+    self.decision = worker.decision.map(MobileAutomationWatchdogDecision.init)
+  }
+}
+
+public struct MobileAutomationWatchdogProcess: Codable, Equatable, Sendable {
+  public let activityKind: String
+  public let activity: String
+
+  public init(process: AutomationWatchdogProcess) {
+    self.activityKind = process.activityKind
+    self.activity = process.activity
+  }
+}
+
+public struct MobileAutomationWatchdogDecision: Codable, Equatable, Sendable {
+  public let action: AutomationWatchdogAction
+  public let confidence: Double
+  public let streak: Int
+  public let requiredStreak: Int
+  public let summary: String
+
+  public init(decision: AutomationWatchdogDecision) {
+    self.action = decision.action
+    self.confidence = decision.confidence
+    self.streak = decision.streak
+    self.requiredStreak = decision.requiredStreak
+    self.summary = decision.summary
   }
 }
 
@@ -217,15 +288,18 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
   private var snapshot: MomentMonitorSnapshot
   private var codexUsage: CodexUsageObservation
   private var oxAudit: OxAuditObservation
+  private var watchdog: AutomationWatchdogObservation
 
   public init(
     snapshot: MomentMonitorSnapshot,
     codexUsage: CodexUsageObservation = .unavailable(message: "Not refreshed yet."),
-    oxAudit: OxAuditObservation = .absent
+    oxAudit: OxAuditObservation = .absent,
+    watchdog: AutomationWatchdogObservation = .absent
   ) {
     self.snapshot = snapshot
     self.codexUsage = codexUsage
     self.oxAudit = oxAudit
+    self.watchdog = watchdog
   }
 
   public func update(_ snapshot: MomentMonitorSnapshot) {
@@ -246,8 +320,25 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
     }
   }
 
+  public func updateWatchdog(_ watchdog: AutomationWatchdogObservation) {
+    self.lock.withLock {
+      self.watchdog = watchdog
+    }
+  }
+
   public func encodedSnapshot(servedAt: Date = Date()) throws -> Data {
-    let values = self.lock.withLock { (self.snapshot, self.codexUsage, self.oxAudit) }
+    let values = self.lock.withLock {
+      (self.snapshot, self.codexUsage, self.oxAudit, self.watchdog)
+    }
+    let watchdog: AutomationWatchdogObservation
+    switch values.3.availability {
+    case .current, .stale:
+      watchdog =
+        values.3.status?.repository?.caseInsensitiveCompare(values.0.repository.fullName)
+          == .orderedSame ? values.3 : .absent
+    case .absent, .invalid:
+      watchdog = values.3
+    }
     let encoder = JSONEncoder()
     encoder.dateEncodingStrategy = .iso8601
     encoder.outputFormatting = [.sortedKeys]
@@ -256,6 +347,7 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
         snapshot: values.0,
         codexUsage: values.1,
         oxAudit: values.2,
+        watchdog: watchdog,
         servedAt: servedAt
       ))
   }

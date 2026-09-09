@@ -82,6 +82,12 @@ App 可以唯讀開啟 controller-owned：
 ~/Library/Application Support/MomentAutomation/runtime/ox-current.json
 ```
 
+以及 maintenance producer-owned Active Auto observer：
+
+```text
+~/Library/Application Support/MomentAutomationMaintenance/watchdog/current.json
+```
+
 Reader 使用 `O_NOFOLLOW`、regular-file、current-user owner、group/other mode
 bits 為零、16 KiB size bound、exact field allow-list、known schema/enum、
 timestamp/counter/SHA consistency 與 live PID 檢查。任何不符合都 fail closed；
@@ -103,6 +109,13 @@ availability state、目前 Issue、完成／總數、最後 HTTP 狀態、更�
 不接受 token、prompt、response、classification finding、route credential、PID 或路徑。
 超過 45 分鐘未更新的非終止狀態標成 Stale。Monitor 不會啟動、停止或喚醒 Ox。
 
+Active Auto watchdog reader 使用 `O_NOFOLLOW`、regular-file、current-user owner、
+mode 0600、32 KiB 上限與 exact nested allow-list。它只接受 observer 狀態、模型顯示
+身分、Issue/worker 顯示識別、phase/role、泛化 process activity、信心與連續觀測計數；
+拒絕未知欄位，因此 PID、assignment token/digest、Git SHA、raw command、prompt、
+response 或 finding 都不能進入 App。超過五分鐘未更新顯示 Stale。Monitor 只讀這份
+輸出，不會呼叫 oMLX、承認 escalation、喚醒 Sol 或改寫 maintenance state。
+
 ## Optional mobile dashboard output
 
 手機 dashboard 預設關閉，啟用後只綁定 `127.0.0.1`。內建 server 只接受
@@ -120,12 +133,13 @@ Host 只允許 loopback 名稱/位址及 Tailscale Serve 的 `.ts.net` 名稱；
 service worker、`localStorage` 或持久化 private snapshot。
 
 Mobile snapshot 是明確 allow-list：repository、時間、health、project progress、
-Codex quota remaining percentage/window/reset time、sanitized runtime phase、allow-listed runtime activity、bounded Issue duration 與各 lane item。它刻意不輸出 controller run ID、PID、
+Codex quota remaining percentage/window/reset time、sanitized runtime phase、allow-listed runtime activity、bounded Issue duration、redacted Active Auto watchdog summary 與各 lane item。它刻意不輸出 controller run ID、PID、
 base/head SHA、account identity、credential、prompt、response、finding、完整命令／輸出或 raw token activity。Issue 標題和工作
 狀態本身仍是私人資料；遠端存取只能使用 Tailscale Serve 和適當 ACL，不得使用
 Tailscale Funnel、public tunnel 或公開 hosting。
 
-同一 snapshot 可包含上述 bounded Ox audit summary；它不包含模型 usage 或分類內容。
+同一 snapshot 可包含上述 bounded Ox audit 與 watchdog summary；它不包含模型 usage、
+prompt/response、repair finding、process identity 或 controller credential。
 
 ## Forbidden behavior
 

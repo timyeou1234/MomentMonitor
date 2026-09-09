@@ -39,6 +39,15 @@ if grep -nE "$local_write_forbidden" "$ox_reader"; then
   exit 1
 fi
 
+watchdog_reader="Sources/MomentMonitorCore/AutomationWatchdogStatus.swift"
+grep -q 'O_RDONLY' "$watchdog_reader"
+grep -q 'O_NOFOLLOW' "$watchdog_reader"
+grep -q 'MomentAutomationMaintenance/watchdog' "$watchdog_reader"
+if grep -nE "$local_write_forbidden" "$watchdog_reader"; then
+  echo "Active watchdog reader contains a write-capable operation." >&2
+  exit 1
+fi
+
 dashboard_server="Sources/MomentMonitorCore/MobileDashboardServer.swift"
 grep -q 'loopbackHost = "127.0.0.1"' "$dashboard_server"
 grep -q 'method == "GET" || method == "HEAD"' "$dashboard_server"
