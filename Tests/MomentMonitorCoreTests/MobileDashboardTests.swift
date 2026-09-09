@@ -319,6 +319,29 @@ final class MobileDashboardTests: XCTestCase {
     XCTAssertEqual(Set(watchdog.keys), ["availability", "workers"])
   }
 
+  func testEnvelopePreservesWatchdogForMixedCaseSnapshotRepository() throws {
+    let status = AutomationWatchdogStatus(
+      schema: "moment.automation-watchdog.v1",
+      observedAt: fixedDate("2026-09-09T13:31:33Z"),
+      state: .idle,
+      model: "Qwen3.5-27B-4bit",
+      confidenceThreshold: 0.8,
+      requiredObservations: 2,
+      repository: "timyeou1234/Moment",
+      workers: []
+    )
+    let store = MobileDashboardSnapshotStore(
+      snapshot: .empty(repository: try RepositoryCoordinate(parsing: "TIMYEOU1234/moment")),
+      watchdog: .current(status)
+    )
+
+    let data = try store.encodedSnapshot()
+    let raw = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let watchdog = try XCTUnwrap(raw["watchdog"] as? [String: Any])
+
+    XCTAssertEqual(watchdog["availability"] as? String, "current")
+  }
+
   func testEnvelopePreservesInvalidWatchdogWithoutPublishingStatus() throws {
     let store = MobileDashboardSnapshotStore(
       snapshot: .empty(repository: .moment),

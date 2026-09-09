@@ -94,6 +94,21 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
     XCTAssertEqual(observation, .absent)
   }
 
+  func testRepositoryBindingIsCaseInsensitive() async throws {
+    try self.write(Self.fixture(repository: "timyeou1234/Moment"))
+    let reader = AutomationWatchdogStatusReader(
+      fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+      currentUserID: Darwin.getuid(),
+      now: { fixedDate("2026-09-09T13:32:00Z") }
+    )
+
+    let observation = await reader.read(
+      repository: try RepositoryCoordinate(parsing: "TIMYEOU1234/moment")
+    )
+
+    XCTAssertEqual(observation.availability, .current)
+  }
+
   func testRejectsUnknownLeaseState() async throws {
     var fixture = Self.fixture()
     var workers = fixture["workers"] as! [[String: Any]]
@@ -190,6 +205,38 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
     let observation = await reader.read(repository: .moment)
 
     XCTAssertEqual(observation.availability, .invalid)
+  }
+
+  func testRejectsImpossibleDecisionStreaks() async throws {
+    for (action, confidence, streak) in [
+      ("observe", 0.96, 2),
+      ("unblock", 0.79, 1),
+      ("takeover", 0.95, 0),
+    ] {
+      var fixture = Self.fixture()
+      var workers = fixture["workers"] as! [[String: Any]]
+      var decision = workers[0]["decision"] as! [String: Any]
+      decision["action"] = action
+      decision["confidence"] = confidence
+      decision["streak"] = streak
+      decision["summary"] =
+        [
+          "observe": "Local model found no actionable stall.",
+          "unblock": "Local model recommends bounded recovery.",
+          "takeover": "Local model recommends isolated repair ownership.",
+        ][action]
+      workers[0]["decision"] = decision
+      fixture["workers"] = workers
+      try self.write(fixture)
+      let reader = AutomationWatchdogStatusReader(
+        fileURL: self.temporaryDirectory.appendingPathComponent("current.json"),
+        currentUserID: Darwin.getuid()
+      )
+
+      let observation = await reader.read(repository: .moment)
+
+      XCTAssertEqual(observation.availability, .invalid, "Accepted \(action) streak \(streak)")
+    }
   }
 
   func testRejectsStateThatContradictsWorkerDecisions() async throws {

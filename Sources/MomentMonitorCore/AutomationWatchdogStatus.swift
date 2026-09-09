@@ -170,7 +170,9 @@ public struct AutomationWatchdogStatusReader: Sendable {
     do {
       guard let data = try self.readSecurely() else { return .absent }
       let status = try Self.decodeAndValidate(data)
-      guard status.repository == repository.fullName else { return .absent }
+      guard status.repository?.caseInsensitiveCompare(repository.fullName) == .orderedSame else {
+        return .absent
+      }
       let age = self.now().timeIntervalSince(status.observedAt)
       guard age >= -30 else { return .invalid("Active observer timestamp is in the future.") }
       if age > Self.freshnessInterval { return .stale(status) }
@@ -260,11 +262,15 @@ public struct AutomationWatchdogStatusReader: Sendable {
         runtimeFieldsAreCoherent(worker)
       else { throw AutomationWatchdogReadError.invalidWorker }
       if let decision = worker.decision {
+        let confidentActionable =
+          [.unblock, .takeover].contains(decision.action)
+          && decision.confidence >= status.confidenceThreshold
         guard let rawDecision = object["decision"] as? [String: Any],
           Set(rawDecision.keys) == decisionKeys,
           (0...1).contains(decision.confidence),
           decision.streak >= 0, decision.streak <= decision.requiredStreak,
           decision.requiredStreak == status.requiredObservations,
+          confidentActionable ? decision.streak >= 1 : decision.streak == 0,
           decision.decidedAt <= status.observedAt.addingTimeInterval(30),
           decision.decidedAt >= status.observedAt.addingTimeInterval(-freshnessInterval),
           decision.summary == decisionSummary[decision.action]

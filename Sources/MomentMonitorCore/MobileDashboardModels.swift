@@ -334,7 +334,8 @@ public final class MobileDashboardSnapshotStore: @unchecked Sendable {
     switch values.3.availability {
     case .current, .stale:
       watchdog =
-        values.3.status?.repository == values.0.repository.fullName ? values.3 : .absent
+        values.3.status?.repository?.caseInsensitiveCompare(values.0.repository.fullName)
+          == .orderedSame ? values.3 : .absent
     case .absent, .invalid:
       watchdog = values.3
     }
