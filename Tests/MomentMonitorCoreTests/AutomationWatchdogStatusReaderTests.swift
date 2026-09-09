@@ -294,6 +294,19 @@ final class AutomationWatchdogStatusReaderTests: XCTestCase {
     XCTAssertEqual(observation.availability, .invalid)
   }
 
+  func testCurrentUnavailableStatusUsesUnavailableBadge() throws {
+    var fixture = Self.fixture()
+    fixture["state"] = "unavailable"
+    var workers = fixture["workers"] as! [[String: Any]]
+    workers[0]["model_available"] = false
+    workers[0].removeValue(forKey: "decision")
+    fixture["workers"] = workers
+    let data = try JSONSerialization.data(withJSONObject: fixture)
+    let status = try AutomationWatchdogStatusReader.decodeAndValidate(data)
+
+    XCTAssertEqual(AutomationWatchdogObservation.current(status).badgeLabel, "UNAVAILABLE")
+  }
+
   func testRejectsContradictoryProcessActivity() async throws {
     var fixture = Self.fixture()
     var workers = fixture["workers"] as! [[String: Any]]

@@ -16,7 +16,7 @@
               .font(.subheadline.weight(.semibold))
           }
           Spacer()
-          Text(self.badge)
+          Text(self.observation.badgeLabel)
             .font(.caption2.weight(.bold))
             .padding(.horizontal, 7)
             .padding(.vertical, 4)
@@ -43,15 +43,6 @@
       .padding(.horizontal, 14)
       .padding(.vertical, 10)
       .accessibilityElement(children: .combine)
-    }
-
-    private var badge: String {
-      switch self.observation.availability {
-      case .absent: "OFF"
-      case .stale: "STALE"
-      case .invalid: "INVALID"
-      case .current: self.observation.status?.state == .idle ? "IDLE" : "LIVE"
-      }
     }
 
     private var tint: Color {

@@ -13,4 +13,11 @@ final class RepositoryCoordinateTests: XCTestCase {
     XCTAssertThrowsError(try RepositoryCoordinate(parsing: "timyeou1234/Moment/issues"))
     XCTAssertThrowsError(try RepositoryCoordinate(parsing: "../Moment"))
   }
+
+  func testInvalidPersistedRepositoryResolvesToDisplayedFallback() {
+    let repository = RepositoryCoordinate.resolvingPersisted("not-a-repository")
+
+    XCTAssertEqual(repository, .moment)
+    XCTAssertEqual(repository.fullName, "timyeou1234/Moment")
+  }
 }

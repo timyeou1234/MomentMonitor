@@ -137,6 +137,21 @@ public struct AutomationWatchdogObservation: Codable, Equatable, Sendable {
   public static func invalid(_ message: String) -> Self {
     Self(availability: .invalid, message: message)
   }
+
+  public var badgeLabel: String {
+    switch self.availability {
+    case .absent: "OFF"
+    case .stale: "STALE"
+    case .invalid: "INVALID"
+    case .current:
+      switch self.status?.state {
+      case .idle: "IDLE"
+      case .unavailable: "UNAVAILABLE"
+      case .observing, .suspectedStall, .unblocking, .takeover: "LIVE"
+      case nil: "UNAVAILABLE"
+      }
+    }
+  }
 }
 
 private struct JSONDuplicateKeyValidator {

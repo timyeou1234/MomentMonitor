@@ -77,11 +77,10 @@
 
     init(defaults: UserDefaults = .standard) {
       self.defaults = defaults
-      let repositoryText =
-        defaults.string(forKey: "repository") ?? RepositoryCoordinate.moment.fullName
-      let configuredRepository =
-        (try? RepositoryCoordinate(parsing: repositoryText)) ?? .moment
-      self.repositoryText = repositoryText
+      let configuredRepository = RepositoryCoordinate.resolvingPersisted(
+        defaults.string(forKey: "repository")
+      )
+      self.repositoryText = configuredRepository.fullName
       self.configuredRepository = configuredRepository
       self.refreshIntervalSeconds = defaults.object(forKey: "refreshIntervalSeconds") as? Int ?? 30
       self.completedItemLimit = defaults.object(forKey: "completedItemLimit") as? Int ?? 8

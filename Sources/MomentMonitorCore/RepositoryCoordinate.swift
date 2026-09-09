@@ -39,4 +39,9 @@ public struct RepositoryCoordinate: Codable, Hashable, Sendable {
 
 extension RepositoryCoordinate {
   public static let moment = try! RepositoryCoordinate(owner: "timyeou1234", name: "Moment")
+
+  public static func resolvingPersisted(_ rawValue: String?) -> Self {
+    guard let rawValue, let repository = try? Self(parsing: rawValue) else { return .moment }
+    return repository
+  }
 }
